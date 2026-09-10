@@ -98,7 +98,14 @@ export function createSite(cfg: SiteConfig): Site {
     if (/^javascript:/i.test(clean) || /^data:/i.test(clean) || /^vbscript:/i.test(clean)) {
       throw new Error('Blocked URL scheme');
     }
-    const u = new URL(clean, base + '/');
+    // base may include a path prefix (e.g. https://api.host/v1) — relative paths
+    // must join against base as a directory, and also replace the LAST segment
+    // when the path starts with '/' (JS URL semantics), so join against base root
+    // unless base has a path (then keep the base path prefix).
+    const basePath = new URL(base).pathname.replace(/\/+$/, '');
+    const u = basePath && basePath !== ''
+      ? new URL(clean.startsWith('/') ? base + clean : clean, base + '/')
+      : new URL(clean, base + '/');
     if (u.hostname.toLowerCase() !== baseHost) {
       throw new Error(`External host rejected: ${u.hostname}`);
     }
@@ -202,7 +209,7 @@ export function createSite(cfg: SiteConfig): Site {
         }
         throw new Error(`HTTP ${res.status} for ${cur}`);
       }
-      if (res.status !== 200) { await res.body?.cancel().catch(() => {}); throw new Error(`HTTP ${res.status} for ${cur}`); }
+      if (res.status < 200 || res.status >= 300) { await res.body?.cancel().catch(() => {}); throw new Error(`HTTP ${res.status} for ${cur}`); }
       void redirects;
       return await readCapped(res);
     }
@@ -237,7 +244,7 @@ export function createSite(cfg: SiteConfig): Site {
     return p;
   }
 
-  async function postAjax(url: string, body: string, postUrl?: string): Promise<string> {
+  async function postAjax(url: string, body: string, postUrl?: string, extraHeaders?: Record<string, string>): Promise<string> {
     const site = url.startsWith('/') ? sanitizeUrl(url) : assertSiteUrl(url);
     if (body.length > 8192) throw new Error('POST body too large');
     const ref = postUrl ? (postUrl.startsWith('/') ? sanitizeUrl(postUrl) : assertSiteUrl(postUrl)) : base + '/';
@@ -254,6 +261,7 @@ export function createSite(cfg: SiteConfig): Site {
         ...(isJson
           ? { 'content-type': 'application/json' }
           : { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' }),
+        ...extraHeaders,
       },
       body,
     })));
