@@ -1,0 +1,18 @@
+{
+  "command": "viewpagesource(https://example.com)",
+  "captured": "2026-09-10",
+  "api_contract": {
+    "token": "GET /api/token -> {token: hex64}",
+    "fetch": "POST /api/fetch {url, token, stylize:false} -> {html, cacheHit, executionTime, metrics:{contentTransfer,dnsLookup,serverWait,tcpConnection,tlsHandshake,totalTime}, pageInfo:{totalSize,totalChars,totalWords,totalLines,tagCount}, serverInfo}",
+    "output_shape": {
+      "id": "md5(url) hex first 8",
+      "saved": "source_<id>.html",
+      "bytes": "byteLength(html)",
+      "metrics": "passthrough or null",
+      "serverInfo": "passthrough or null",
+      "pageInfo": "passthrough or null",
+      "meta": "{url, title|null, meta{}, links[](deduped, no mailto:/javascript:/#)}"
+    }
+  },
+  "note": "legacy never ran locally (axios missing); golden captured via direct curl against live API"
+}
