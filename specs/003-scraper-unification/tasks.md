@@ -4,19 +4,19 @@
 
 ## Phase 0 — Core extraction (parity is the gate)
 
-- [ ] 0.1 `core/parse.ts` — extract txt/num/firstText/sliceBalanced/extractPageVar/extractEmbedUrl/parseCards + regexes from nontonanime.ts
-- [ ] 0.2 `core/fetch.ts` — `createSite({base, headers?, ttlMs?, rateMs?, maxRetries?})` returning isolated {fetchPage, postAjax, cacheApi}; nontonanime guards move in verbatim
-- [ ] 0.3 `core/cli.ts` — defineCLI command-table runner (help, [ERROR], exit 1, JSON out)
-- [ ] 0.4 Refactor nontonanime.ts onto core/ — ZERO behavior change
-- [ ] 0.5 GATE: `bun run parity` → 79/0 + tsc clean
+- [x] 0.1 `core/parse.ts` — extract txt/num/firstText/sliceBalanced/extractPageVar/extractEmbedUrl/parseCards + regexes from nontonanime.ts
+- [x] 0.2 `core/fetch.ts` — `createSite({base, headers?, ttlMs?, rateMs?, maxRetries?})` returning isolated {fetchPage, postAjax, cacheApi}; nontonanime guards move in verbatim
+- [x] 0.3 `core/cli.ts` — defineCLI command-table runner (help, [ERROR], exit 1, JSON out)
+- [x] 0.4 Refactor nontonanime.ts onto core/ — ZERO behavior change
+- [x] 0.5 GATE: `bun run parity` → 79/0 + tsc clean
 
 ## Phase 1 — Easy wins (static/simple sites)
 
-- [ ] 1.1 view-page-source (63L): golden → migrate → verify → git mv
-- [ ] 1.2 codeengo (103L): same loop
-- [ ] 1.3 freeconvert (100L): same loop (CJS→ESM)
-- [ ] 1.4 drowify (117L): same loop (mark offline-verify if site dead)
-- [ ] 1.5 whitehouse.gov (334L): same loop
+- [x] 1.1 view-page-source (63L): golden → migrate → verify → git mv
+- [x] 1.2 codeengo (103L): same loop
+- [x] 1.3 freeconvert (100L): same loop (CJS→ESM)
+- [x] 1.4 drowify (117L): same loop (mark offline-verify if site dead)
+- [x] 1.5 whitehouse.gov (334L): same loop
 
 ## Phase 2 — Medium (anti-bot / multi-step)
 

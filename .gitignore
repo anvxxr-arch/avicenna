@@ -2,3 +2,10 @@ node_modules/
 deploy/api.env
 specs/001-parity-test-suite/parity-report.json
 nontonanime-rs/target/
+
+# golden captures are local verification artifacts (shapes recorded in specs/003-scraper-unification/golden/<scraper>/contract.json)
+golden/
+downloads/
+codeengo_*.jpg
+source_*.html
+_wh_tmp.cjs

@@ -25,7 +25,7 @@ export interface Site {
   sanitizeUrl(p: string): string;
   resolveUrl(raw: string, base: string): string;
   fetchPage(url: string): Promise<string>;
-  postAjax(url: string, body: string, postUrl?: string): Promise<string>;
+  postAjax(url: string, body: string, postUrl?: string, extraHeaders?: Record<string, string>): Promise<string>;
   cacheApi: { stats(): { size: number; max: number }; purge(): number };
 }
 

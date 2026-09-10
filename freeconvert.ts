@@ -10,8 +10,6 @@ import fs from 'fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 
-declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
-
 import { defineCli } from './core/cli';
 import { createSite } from './core/fetch';
 
@@ -27,12 +25,12 @@ const API = 'https://api.freeconvert.com/v1';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function api(method: 'get' | 'post', url: string, body: unknown, token?: string): Promise<Record<string, unknown>> {
+  if (!isValidUrl(API + url)) throw new Error('bad api url');
   // all /process/jobs responses are JSON; auth goes as Bearer header
   const auth = token ? { authorization: `Bearer ${token}` } : undefined;
   const raw = method === 'get'
     ? await fetchPage(url) // GET with auth unsupported by fetchPage — jobs GET happens via waitDone below
     : await postAjax(url, JSON.stringify(body), API + '/process/jobs', auth);
-  if (!isValidUrl(API + url)) throw new Error('bad api url');
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
@@ -64,7 +62,7 @@ function jobBody(target: number) {
   };
 }
 
-interface Job { id?: string; status?: string; tasks?: Array<{ operation: string; result?: { form?: { url: string; parameters: Record<string, string> } } | { url?: string } }> }
+interface Job { id?: string; status?: string; tasks?: Array<{ operation: string; result?: { form?: { url: string; parameters: Record<string, string> }; url?: string } }> }
 
 async function uploadFile(job: Job, token: string, file: string): Promise<unknown> {
   const task = job.tasks?.find((t) => t.operation === 'import/upload');
