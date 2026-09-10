@@ -8,7 +8,22 @@
   "scripts": {
     "parity": "bun tools/parity.ts --live",
     "parity:guards": "bun tools/parity.ts --guards-only",
-    "api": "bun api/nontonanime/server.ts"
+    "api": "bun api/nontonanime/server.ts",
+    "anilist": "bun anilist.ts",
+    "animeindo": "bun animeindo.ts",
+    "codeengo": "bun codeengo.ts",
+    "drowify": "bun drowify.ts",
+    "freeconvert": "bun freeconvert.ts",
+    "lk21": "bun lk21.ts",
+    "nontonanime": "bun nontonanime.ts",
+    "otakudesu": "bun otakudesu.ts",
+    "sakana": "bun sakana.ts",
+    "spotify": "bun spotify.ts",
+    "tiktok": "bun tiktok.ts",
+    "view-page-source": "bun view-page-source.ts",
+    "whitehouse": "bun whitehouse.ts",
+    "yt": "bun yt.ts",
+    "ytmusic": "bun ytmusic.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2"
