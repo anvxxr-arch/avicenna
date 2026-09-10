@@ -241,9 +241,20 @@ export function createSite(cfg: SiteConfig): Site {
     const site = url.startsWith('/') ? sanitizeUrl(url) : assertSiteUrl(url);
     if (body.length > 8192) throw new Error('POST body too large');
     const ref = postUrl ? (postUrl.startsWith('/') ? sanitizeUrl(postUrl) : assertSiteUrl(postUrl)) : base + '/';
+    // JSON body → JSON content-type; otherwise form-encoded (matches legacy axios behavior)
+    const isJson = body.trimStart().startsWith('{') || body.trimStart().startsWith('[');
     return limiter.run(() => withRetry(() => doFetch(site, {
       method: 'POST',
-      headers: { ...BASE_HEADERS, 'accept': '*/*', 'origin': base, 'referer': ref, 'x-requested-with': 'XMLHttpRequest', 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      headers: {
+        ...BASE_HEADERS,
+        'accept': '*/*',
+        'origin': base,
+        'referer': ref,
+        'x-requested-with': 'XMLHttpRequest',
+        ...(isJson
+          ? { 'content-type': 'application/json' }
+          : { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' }),
+      },
       body,
     })));
   }
