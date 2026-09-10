@@ -7,9 +7,6 @@
 
 import { writeFile } from 'node:fs/promises';
 
-declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
-declare const Buffer: { from(data: string, enc?: string): { toString(enc?: string): string; length: number } };
-
 import { defineCli } from './core/cli';
 import { createSite } from './core/fetch';
 

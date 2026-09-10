@@ -10,5 +10,8 @@
     "parity": "bun tools/parity.ts --live",
     "parity:guards": "bun tools/parity.ts --guards-only",
     "parity:report": "bun tools/parity.ts --live --report specs/001-parity-test-suite/parity-report.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2"
   }
 }

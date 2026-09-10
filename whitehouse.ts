@@ -43,7 +43,8 @@ async function fetchHtml(url: string): Promise<string> {
   return fetchPage(url);
 }
 
-function abs(url: string, base: string): string {
+function abs(url: string | undefined, base: string): string {
+  if (!url) return '';
   try { return new URL(url, base).href; } catch { return url; }
 }
 
@@ -91,14 +92,24 @@ function parseFilters($: CheerioAPI, baseUrl: string) {
   return filters;
 }
 
-function parsePost($: CheerioAPI, el: never) {
+interface Post {
+  title: string;
+  url: string | null;
+  categories: string[];
+  date: string | null;
+  dateISO: string | null;
+  thumbnail: string | null;
+  postId: number | null;
+}
+
+function parsePost($: CheerioAPI, el: never): Post {
   const $el = $(el);
   const $title = $el.find('h2.wp-block-post-title').first();
   const $a = $title.find('a').first();
   const $cover = $el.find('a.wp-block-cover__action').first();
   const url = $a.attr('href') || $cover.attr('href') || null;
   const cats: string[] = [];
-  $el.find('.wp-block-post-terms a').each((_, c) => cats.push($(c).text().trim()));
+  $el.find('.wp-block-post-terms a').each((_, c) => { cats.push($(c).text().trim()); });
   const $time = $el.find('.wp-block-post-date time').first();
   const idMatch = ($el.attr('class') || '').match(/post-(\d+)/);
   return {
@@ -114,7 +125,7 @@ function parsePost($: CheerioAPI, el: never) {
 
 function parseListing(html: string, url: string) {
   const $ = cheerio.load(html);
-  const posts = [];
+  const posts: Post[] = [];
   $('li.wp-block-post').each((_, el) => {
     const p = parsePost($, el as never);
     if (p.title) posts.push(p);
@@ -129,9 +140,11 @@ function parseListing(html: string, url: string) {
   };
 }
 
+interface VideoEntry { title: string; url: string; thumbnail: string | null; duration: string | null; date: string | null; dateISO: string | null }
+
 function parseVideos(html: string, url: string) {
   const $ = cheerio.load(html);
-  const posts = [];
+  const posts: VideoEntry[] = [];
   $('div.wp-block-whitehouse-past-event').each((_, el) => {
     const $el = $(el);
     const $a = $el.find('a').first();
@@ -151,12 +164,12 @@ function parseVideos(html: string, url: string) {
 
 function parseSearch(html: string, url: string) {
   const $ = cheerio.load(html);
-  const posts = [];
+  const posts: Post[] = [];
   $('li.wp-block-post').each((_, el) => {
     const p = parsePost($, el as never);
     if (p.title) posts.push(p);
   });
-  const typeFilters = [];
+  const typeFilters: Array<{ label: string; type: string | null; checked: boolean }> = [];
   $('fieldset.wp-block-search__filters label').each((_, el) => {
     const $l = $(el);
     typeFilters.push({
@@ -188,18 +201,19 @@ function parseDetail(html: string, url: string) {
 
   const entry = $('div.entry-content').first();
   entry.find('.wp-block-whitehouse-topper').remove();
-  const images = [];
+  const images: string[] = [];
   entry.find('img').each((_, img) => {
     const src = $(img).attr('src');
     if (src) images.push(src);
   });
   const bodyText = entry.text().replace(/\s+/g, ' ').trim();
 
-  let schema = null;
+  interface SchemaNode { '@type'?: string; articleSection?: unknown; datePublished?: unknown; dateModified?: unknown; wordCount?: unknown; thumbnailUrl?: unknown }
+  let schema: SchemaNode | null = null;
   const ld = $('script.yoast-schema-graph').first().text();
   if (ld) {
     try {
-      const parsed = JSON.parse(ld);
+      const parsed = JSON.parse(ld) as { '@graph'?: SchemaNode[] };
       const graph = Array.isArray(parsed['@graph']) ? parsed['@graph'] : [];
       schema = graph.find((n) => n && n['@type'] === 'Article') || graph.find((n) => n && n['@type'] === 'WebPage') || null;
     } catch { schema = null; }
@@ -215,11 +229,11 @@ function parseDetail(html: string, url: string) {
     date: $date.text().trim() || null,
     dateISO: $date.attr('datetime') || null,
     eoNumber,
-    sections: (schema as Record<string, unknown>)?.articleSection || null,
-    published: (schema as Record<string, unknown>)?.datePublished || null,
-    modified: (schema as Record<string, unknown>)?.dateModified || null,
-    wordCount: (schema as Record<string, unknown>)?.wordCount || null,
-    featuredImage: (schema as Record<string, unknown>)?.thumbnailUrl || images[0] || null,
+    sections: schema?.articleSection || null,
+    published: schema?.datePublished || null,
+    modified: schema?.dateModified || null,
+    wordCount: schema?.wordCount || null,
+    featuredImage: schema?.thumbnailUrl || images[0] || null,
     images,
     bodyText,
     bodyHtml: entry.html() || null,
@@ -231,7 +245,7 @@ function parseHome(html: string) {
   const topper = $('.wp-block-whitehouse-topper').first();
   const heroVideo = topper.find('.wp-block-whitehouse-topper__media video').attr('src')
     || topper.find('.wp-block-whitehouse-topper__media video source').attr('src') || null;
-  const videos = [];
+  const videos: Array<{ title: string; url: string | null; video: string | null }> = [];
   $('.wp-block-whitehouse-video-accordion-item').each((_, el) => {
     const $el = $(el);
     const $a = $el.find('.wp-block-whitehouse-video-accordion-item__link').first();
@@ -242,12 +256,12 @@ function parseHome(html: string) {
       video: $v.attr('src') || null,
     });
   });
-  const paragraphs = [];
+  const paragraphs: string[] = [];
   $('.site-content .entry-content p, .site-content main p').each((_, el) => {
     const t = $(el).text().replace(/\s+/g, ' ').trim();
     if (t) paragraphs.push(t);
   });
-  const headings = [];
+  const headings: string[] = [];
   $('main h2, main h3, main h4').each((_, el) => {
     const t = $(el).text().replace(/\s+/g, ' ').trim();
     if (t) headings.push(t);
@@ -265,7 +279,7 @@ function parseHome(html: string) {
 
 function parseAdministration(html: string) {
   const $ = cheerio.load(html);
-  const profiles = [];
+  const profiles: Array<{ name: string; role: string | null; url: string | null; image: string | null; bio: string }> = [];
   $('.entry-content .wp-block-columns').each((_, group) => {
     const $group = $(group);
     const $cols = $group.children('.wp-block-column');
