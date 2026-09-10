@@ -1,0 +1,14 @@
+{
+  "name": "avicenna",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "node-fetch": "^3.3.2"
+  },
+  "scripts": {
+    "parity": "bun tools/parity.ts --live",
+    "parity:guards": "bun tools/parity.ts --guards-only",
+    "parity:report": "bun tools/parity.ts --live --report specs/001-parity-test-suite/parity-report.json"
+  }
+}

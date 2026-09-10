@@ -1,0 +1,28 @@
+[Unit]
+Description=NontonAnimeID JSON API (Bun)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# NOTE: User=/Group= omitted — systemd --user already runs as dwizzy;
+# setting User= in a user unit fails with status=216/GROUP (supplementary groups)
+WorkingDirectory=/home/dwizzy/avicenna
+# localhost-only — Cloudflare tunnel fronts this
+Environment=API_HOST=127.0.0.1
+Environment=API_PORT=8899
+# set a real token via an env file (not committed):
+#   echo 'API_ADMIN_TOKEN=change-me' > /home/dwizzy/avicenna/deploy/api.env
+EnvironmentFile=-/home/dwizzy/avicenna/deploy/api.env
+ExecStart=/home/dwizzy/.bun/bin/bun api/nontonanime/server.ts
+Restart=on-failure
+RestartSec=5
+# hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/dwizzy/avicenna
+
+[Install]
+WantedBy=default.target

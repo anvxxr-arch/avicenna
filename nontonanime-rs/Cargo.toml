@@ -1,0 +1,24 @@
+[package]
+name = "nontonanime-rs"
+version = "2.0.0"
+edition = "2021"
+
+[[bin]]
+name = "nontonanime"
+path = "nontonanime.rs"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full"] }
+reqwest = { version = "0.11.24", default-features = false, features = ["rustls-tls-manual-roots", "gzip", "brotli"] }
+scraper = "0.18.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+base64 = "0.22"
+# pin url 2.4 so idna/icu stay on the edition2021 chain (rustc 1.75 has no edition2024)
+url = "=2.4.0"
+# same for encoding_rs (pulled by html5ever): pre-edition2024 point release
+encoding_rs = "=0.8.35"
+# system CA roots for rustls manual-roots
+rustls = { version = "=0.21.10", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0"

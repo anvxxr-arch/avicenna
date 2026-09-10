@@ -1,0 +1,4 @@
+node_modules/
+deploy/api.env
+specs/001-parity-test-suite/parity-report.json
+nontonanime-rs/target/
