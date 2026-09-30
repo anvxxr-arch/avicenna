@@ -232,12 +232,23 @@ func TestLK21SlugGuard(t *testing.T) {
 }
 
 func TestRegistryCoversPortedScrapers(t *testing.T) {
+	// All 14 ported scrapers: every command of the TS reference must exist, so a
+	// dropped command is a test failure rather than a silent regression.
 	want := map[string][]string{
-		"drowify":        {"search", "artist", "album", "lyrics", "suggest", "audio"},
+		"anilist":        {"detail", "populer", "search"},
+		"animeindo":      {"batch", "detail", "episode", "genre", "genrelist", "home", "jadwal", "movies", "search", "supported", "watch"},
 		"codeengo":       {"generate", "styles", "test"},
-		"viewpagesource": {"view", "token"},
-		"anilist":        {"populer", "search", "detail"},
-		"lk21":           {"list", "sections", "detail", "list-detail"},
+		"drowify":        {"album", "artist", "audio", "lyrics", "search", "suggest"},
+		"freeconvert":    {"compress"},
+		"lk21":           {"detail", "list", "list-detail", "sections"},
+		"otakudesu":      {"batch", "complete", "detail", "episode", "genre", "genrelist", "home", "jadwal", "ongoing", "search", "watch"},
+		"sakana":         {"chat", "conversations", "delete", "models"},
+		"spotify":        {"album", "artist", "episode", "home", "playlist", "search", "show", "track"},
+		"tiktok":         {"download", "user", "video"},
+		"viewpagesource": {"token", "view"},
+		"whitehouse":     {"administration", "briefings", "detail", "executive-orders", "fact-sheets", "gallery", "home", "memoranda", "news", "nominations", "presidential-actions", "proclamations", "releases", "remarks", "research", "search", "videos"},
+		"yt":             {"download", "info", "related", "search"},
+		"ytmusic":        {"download", "info", "lyrics", "related", "search"},
 	}
 	for name, cmds := range want {
 		s, ok := Find(name)
@@ -250,8 +261,8 @@ func TestRegistryCoversPortedScrapers(t *testing.T) {
 				t.Errorf("%s: command %q missing", name, c)
 			}
 		}
-		if len(s.Commands) != len(cmds) {
-			t.Errorf("%s: %d commands, want %d", name, len(s.Commands), len(cmds))
+		if got := len(s.Commands); got != len(cmds) {
+			t.Errorf("%s: %d commands, want %d (update this matrix when the CLI surface changes)", name, got, len(cmds))
 		}
 	}
 }
