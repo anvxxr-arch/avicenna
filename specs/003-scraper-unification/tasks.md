@@ -1,6 +1,6 @@
 # Tasks: Scraper Unification
 
-**Branch**: `003-scraper-unification` · **Plan**: [plan.md](./plan.md) · **Status**: ✅ CONVERGED (14/14 migrated, live-verified)
+**Branch**: `003-scraper-unification` · **Plan**: [plan.md](./plan.md) · **Status**: ✅ CONVERGED — 14/14 migrated; contract drift found in the 2026-09-30 audit was repaired and is now machine-checked by `bun tools/contract.ts --check`.
 
 ## Phase 0 — Core extraction (parity is the gate)
 
@@ -38,6 +38,15 @@
 - [x] 4.1 Deps: remove axios/node-fetch/form-data; package.json scripts for 14 scrapers
 - [x] 4.2 Root clean: only .ts entries; legacy/ holds originals
 - [x] 4.3 Final: tsc all entries, parity 79/0, per-scraper golden diffs all empty, cache-hit verification
+
+## Audit + repair (2026-09-30)
+The earlier "live-verified" claim did not hold. A deep audit found and this branch fixed:
+- **whitehouse**: listing contract had been rewritten (pagination `total`/per-page objects dropped, `next` always null, `filters` always empty) and 5 section paths 404'd. Restored to the legacy shape; golden-diff on `golden/whitehouse.news.json` now passes.
+- **lk21**: parser had been reduced (dropped `id/runtime/poster/info/tags/countries/synopsis/player/players/downloadUrl/trailerUrl`, dropped per-section `loadmore` pagination, and returned an all-null object on a WAF challenge). Restored to the legacy contract; the missing `legacy/lk21.js` original was recovered from history.
+- **Dropped commands** restored: `animeindo supported|watch`, `otakudesu watch`, `sakana conversations|delete`, `codeengo --styles|--test`, `lk21 --sections`.
+- **Cross-cutting**: CLI flag semantics (`--flag` was falsy, `--flag v` ate positionals) fixed in `core/cli.ts` with a per-command flag schema; `nontonanime` moved onto the same shared runner (unknown command now exits 1).
+- **Transport**: every scraper now runs on `core/fetch.ts` — zero raw `fetch` remains in the scraper files. New `site.request()` / `site.requestExternal()` carry the SSRF guards, limiter, timeout, caps and a per-hop redirect allowlist.
+- **Verification**: `bun tools/contract.ts --check` (14 scrapers, 38 live cases) replaces the hand-written contract prose and is negative-tested.
 
 ## Execution notes (2026-09-10)
 

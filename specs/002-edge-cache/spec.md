@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-09
 
-**Status**: Draft
+**Status**: Implemented — cache headers, purge auth and graceful shutdown verified live 2026-09-30. See `specs/002-edge-cache/tasks.md`.
 
 **Input**: User description: "Productionize api/nontonanime/server.ts for the homeserver: hardened server config, systemd autostart, Cloudflare edge caching with correct TTL/no-store semantics, and health monitoring."
 

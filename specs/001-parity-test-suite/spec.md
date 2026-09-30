@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-09
 
-**Status**: Draft
+**Status**: Implemented — verified live 2026-09-30 (`bun tools/parity.ts --live` → 79 pass / 0 fail / 0 skip-waf).
 
 **Input**: User description: "Automated parity test suite proving nontonanime.ts, nontonanime.go, and nontonanime-rs produce identical behavior — command surface, JSON shapes, guard behavior, and live-site results."
 
@@ -72,9 +72,9 @@ The suite verifies security guard behavior is identical across runtimes: travers
 
 ## Review & Acceptance Checklist
 
-- [ ] All 21 CLI commands covered with identical args across runtimes
-- [ ] JSON deep-equal has explicit, documented ignore-list for volatile fields
-- [ ] Guard suite runs offline
-- [ ] Exit codes 0/1/2 implemented per story 3
-- [ ] Report JSON written on every run
-- [ ] Suite completes < 10 min on residential connection
+- [x] All 21 CLI commands covered with identical args across runtimes
+- [x] JSON deep-equal has explicit, documented ignore-list for volatile fields (nonce/postId/bare-URL policy in `tools/parity.ts`)
+- [x] Guard suite runs offline (`--guards-only`, 16 cases, no network)
+- [x] Exit codes 0/1/2 implemented per story 3
+- [x] Report JSON written on every run (gitignored: `specs/*/parity-report.json`)
+- [x] Suite completes < 10 min on residential connection (79.2s observed)

@@ -1,6 +1,6 @@
 # Tasks: Edge-Cached API Service
 
-**Branch**: `002-edge-cache` · **Spec**: [spec.md](./spec.md) · **Status**: ✅ CONVERGED
+**Branch**: `002-edge-cache` · **Spec**: [spec.md](./spec.md) · **Status**: ✅ CONVERGED (re-verified 2026-09-30)
 
 ## Story 1 — Hardened server defaults (P1)
 
@@ -19,7 +19,7 @@
 ## Story 3 — Edge caching + purge (P3)
 
 - [x] 3.1 `stale-while-revalidate` added (TTL×4) to all cacheable Cache-Control headers
-- [x] 3.2 `x-cache: PASS` header on all responses (HIT/MISS wiring tracked as follow-up — LRU outcome not yet plumbed into response)
+- [x] 3.2 `x-cache` header on all responses. **Note (2026-09-30):** `HIT`/`MISS` is plumbed in the Go server (which owns the route table going forward); the legacy Bun server still emits `PASS` everywhere.
 - [x] 3.3 `POST /admin/purge`: token unset → 404 (hidden); wrong token → 401; valid → `{purged: N}`; timing-safe compare
 - [x] 3.4 `deploy/README.md`: systemd install, Cloudflare Cache Rule recipe (respect-origin → no-store routes bypass edge), purge flow, log access
 - [x] 3.5 `deploy/api.env` gitignored for real tokens

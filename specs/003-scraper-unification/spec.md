@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-10
 
-**Status**: Draft
+**Status**: Implemented — contract drift found in the 2026-09-30 audit was repaired and is now enforced by `bun tools/contract.ts --check` (see tasks.md).
 
 **Input**: User description: "Update 14 legacy scraper scripts (anilist, animeindo, codeengo, m.youtube.com, music.youtube.com, open.spotify.com, otakudesu, sakana, whitehouse.gov, drowify-music, freeconvert, tiktok, lk21official, view-page-source) onto the hardened nontonanime core (fetchPage/limiter/cache/guards), keeping every existing feature. Spec the migration."
 
@@ -100,10 +100,10 @@ Each of the 14 scrapers becomes `<name>.ts` (or stays .js only if zero-change) w
 
 ## Review & Acceptance Checklist
 
-- [ ] core/ extracted; nontonanime.ts consumes it; parity 79/0 unchanged
-- [ ] 14/14 scrapers migrated to ESM + core/, feature-complete
-- [ ] Golden-file key-shape diff = empty for every scraper
-- [ ] axios/node-fetch/form-data removed from deps
-- [ ] legacy/*.js preserved; root clean (only .ts entries)
-- [ ] Every scraper: help text, [ERROR] semantics, cache hits on repeat
-- [ ] anilist bot-handler export intact + CLI added
+- [x] core/ extracted; nontonanime.ts consumes it; parity 79/0 unchanged
+- [x] 14/14 scrapers migrated to ESM + core/, feature-complete (contract gate: 14 scrapers, 38 cases)
+- [x] Golden-file key-shape diff = empty for every scraper (`bun tools/contract.ts --check`)
+- [x] axios/node-fetch/form-data removed from deps
+- [x] legacy/*.js preserved (incl. the recovered `legacy/lk21.js`); root clean (only .ts entries)
+- [x] Every scraper: help text, `[ERROR]`→stderr+exit 1, cache hits on repeat (all 15 CLIs on the shared `core/cli.ts` runner)
+- [x] anilist bot-handler export intact + CLI added

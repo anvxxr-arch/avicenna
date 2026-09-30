@@ -2008,6 +2008,8 @@ Usage:
   nontonanime-go genres [az|popular|ongoing] / genre <slug> [page] / ongoing [sort]
   nontonanime-go popular / schedule / recent [page] / top / season <s> <y> [page]
   nontonanime-go more --offset=N [ids..]
+  nontonanime-go serve [-addr :8899] [-cors] [-adminToken TOKEN] [-spec]
+  nontonanime-go openapi
 
 Advanced Search Options:
   --sort=... --status=... --type=... --score_min=<n> --score_max=<n>
@@ -2029,6 +2031,11 @@ func emit(v interface{}) {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(string(b))
 }
+
+// apiCommandHook is installed by api_go.go's init() (the HTTP API server lives in
+// that file; main must not hard-reference it — tools/parity.ts rebuilds the binary
+// from nontonanime.go alone). nil when the API file is not part of the build.
+var apiCommandHook func(cmd string, args []string) bool
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -2069,6 +2076,11 @@ func main() {
 		result interface{}
 		err    error
 	)
+	// serve / openapi live in api_go.go and are reached through the hook so this
+	// file still compiles standalone.
+	if apiCommandHook != nil && apiCommandHook(cmd, pos[1:]) {
+		return
+	}
 	switch cmd {
 	case "home":
 		result, err = getHomeContent(pgArg(get(1)))

@@ -372,8 +372,8 @@ async function show(id: string): Promise<Rec> {
       average: avgRating.average,
       totalRatings: avgRating.totalRatings,
     } : null,
-    // labels is optional inside contentRatingV2; a missing labels list means "not explicit"
-    explicit: contentRating ? get<Array<string>>(contentRating, 'labels')?.includes('EXPLICIT') === true : (contentRating ?? null),
+    // contentRatingV2 may omit `labels`; a missing list means "not explicit" (previously threw on indexOf)
+    explicit: contentRating ? get<Array<string>>(contentRating, 'labels')?.includes('EXPLICIT') === true : false,
     totalEpisodes: ev ? ev.totalCount : epItems.length,
     episodes: epItems,
   };
