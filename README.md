@@ -6,6 +6,8 @@ transport, once, and is verified on the real surface.
 
 - **API**: `nontonanime serve` (Go, standard library only) — uniform envelope, cache headers that reflect reality, OpenAPI emitted from the same route table that serves traffic.
 - **Frontend**: React 19 + Tailwind v4 + anime.js, bundled and served by Bun. Pages: `/`, `/docs`, `/playground`, `/about`, and one page per source (`/anime`, `/film`, `/manga`, `/music`, `/youtube`, `/tiktok`, `/instagram`, `/facebook`, `/twitter`, `/drowify`, `/whitehouse`, `/tools`).
+- **Scrapers**: 14 sources ported to Go (`scrapers/`), served both as CLI commands and as
+  `/api/v1/<scraper>/<command>` routes generated from the same registry.
 - **Reference implementation**: the TypeScript CLIs. The Go/Rust ports are diffed against them by a live parity suite.
 
 ## Quick start
@@ -33,7 +35,17 @@ Every route answers with the same envelope:
 `error.code` is one of `bad_request`, `not_found`, `upstream_error`, `internal`. Nonce-derived routes
 (`/stream`, `/resolve`, `/servers`, `/more`) and every error are `Cache-Control: no-store`.
 
-## Scrapers (TypeScript reference CLIs)
+## Scrapers
+
+The Go binary is the backend: **one CLI for every source**, the same command surface as the
+TypeScript reference (`avicenna <scraper> <command> [args…]`), plus the HTTP API.
+
+```bash
+/tmp/avicenna yt info dQw4w9WgXcQ           # the same surface as `bun yt.ts info …`
+/tmp/avicenna help                          # every scraper + command
+```
+
+The TypeScript CLIs remain the *reference implementation* the Go/Rust ports are diffed against:
 
 ```bash
 bun nontonanime.ts search "one piece"      # anime

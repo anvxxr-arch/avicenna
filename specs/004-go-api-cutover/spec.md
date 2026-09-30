@@ -1,11 +1,22 @@
 # Feature Specification: Go API cutover
 
-**Status**: Draft · **Created**: 2026-09-30
+**Status**: Delivered · **Created**: 2026-09-30
 
 ## Why
 The objective is that backend weight sits on Go/Rust. Today `api/nontonanime/server.ts` (Bun) owns the
 route table while `scrapers/*.ts` own the scraping, and a Go server is being introduced. Two servers with
 two route tables and two envelopes is a defect waiting to happen.
+
+## Delivered (verified 2026-09-30)
+- All 14 sources are ported into the Go `scrapers/` package and registered in one CLI/route registry.
+- `nontonanime serve` owns `/api/v1/*`: 104 route entries (101 HTTP + admin/openapi index entries),
+  envelope + cache policy emitted from the same table that generates OpenAPI.
+- `api/nontonanime/server.ts` is deleted together with its package script and systemd unit; Bun builds
+  and serves the frontend only.
+- Filesystem-touching commands (`freeconvert compress`, `viewpagesource view`) are marked `LocalOnly` and
+  never get an HTTP route — a query string cannot name a server-side path.
+- Client-argument errors answer 400 (`bad_request`); upstream refusals (any upstream 4xx/5xx, WAF) answer
+  502 (`upstream_error`); unknown routes answer 404 — verified across all routes.
 
 ## Contract
 - Exactly **one** public API process: the Go binary (`nontonanime serve`).
