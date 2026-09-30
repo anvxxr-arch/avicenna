@@ -58,3 +58,9 @@ The earlier "live-verified" claim did not hold. A deep audit found and this bran
 - spotify: trackUnion {__typename,message} shape for dead ids handled; track live (playcount 1.17B)
 - otakudesu: admin-ajax double-nonce flow (get nonce → getStreamUrl) live: 12 stream URLs resolved
 - deps: axios/node-fetch/form-data eliminated; only cheerio remains
+
+## Samehadaku (source 15)
+- [x] TS reference `samehadaku.ts` (home/search/list/detail/episode/batch/mirrors)
+- [x] Go port `scrapers/samehadaku.go` registered in the CLI/route registry
+- [x] Real page fixtures in `tools/fixtures/samehadaku/` + offline parser tests (`scrapers/samehadaku_test.go`)
+- [x] Live verification: all 7 routes answer with real data (site is Cloudflare-fronted; the Go client gets through)
