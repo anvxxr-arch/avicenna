@@ -23,7 +23,11 @@
     "view-page-source": "bun view-page-source.ts",
     "whitehouse": "bun whitehouse.ts",
     "yt": "bun yt.ts",
-    "ytmusic": "bun ytmusic.ts"
+    "ytmusic": "bun ytmusic.ts",
+    "contract": "bun tools/contract.ts --check",
+    "contract:capture": "bun tools/contract.ts --capture",
+    "secrets": "bun tools/scan-secrets.ts --all",
+    "golden-diff": "bun tools/golden-diff.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2"

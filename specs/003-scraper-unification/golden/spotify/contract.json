@@ -1,0 +1,418 @@
+{
+  "scraper": "spotify",
+  "capturedAt": "2026-09-30T01:16:39.225Z",
+  "cases": [
+    {
+      "args": [
+        "home",
+        "--nodetail",
+        "--limit=3"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "greeting",
+          "value": "string"
+        },
+        {
+          "key": "sectionCount",
+          "value": "number"
+        },
+        {
+          "key": "sections",
+          "value": [
+            [
+              {
+                "key": "items",
+                "value": [
+                  [
+                    {
+                      "key": "id",
+                      "value": "string"
+                    },
+                    {
+                      "key": "imageUrl",
+                      "value": "string"
+                    },
+                    {
+                      "key": "title",
+                      "value": "string"
+                    },
+                    {
+                      "key": "uri",
+                      "value": "string"
+                    }
+                  ]
+                ]
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "uri",
+                "value": "string"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "args": [
+        "search",
+        "bad habits",
+        "--limit=3"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "limit",
+          "value": "number"
+        },
+        {
+          "key": "query",
+          "value": "string"
+        },
+        {
+          "key": "results",
+          "value": [
+            {
+              "key": "albums",
+              "value": [
+                [
+                  {
+                    "key": "artists",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  },
+                  {
+                    "key": "year",
+                    "value": "number"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "artists",
+              "value": [
+                [
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  },
+                  {
+                    "key": "verified",
+                    "value": "boolean"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "episodes",
+              "value": [
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "playlists",
+              "value": [
+                [
+                  {
+                    "key": "description",
+                    "value": "null"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "owner",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "owner",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "podcasts",
+              "value": [
+                [
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "publisher",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "tracks",
+              "value": [
+                [
+                  {
+                    "key": "album",
+                    "value": "string"
+                  },
+                  {
+                    "key": "artists",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "cover",
+                    "value": "string"
+                  },
+                  {
+                    "key": "duration",
+                    "value": "string"
+                  },
+                  {
+                    "key": "explicit",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "users",
+              "value": [
+                [
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "uri",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "args": [
+        "track",
+        "6PQ88X9TkUIAUIZJHW2upE"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "album",
+          "value": "string"
+        },
+        {
+          "key": "artists",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "cover",
+          "value": "string"
+        },
+        {
+          "key": "duration",
+          "value": "string"
+        },
+        {
+          "key": "explicit",
+          "value": "boolean"
+        },
+        {
+          "key": "id",
+          "value": "string"
+        },
+        {
+          "key": "playcount",
+          "value": "string"
+        },
+        {
+          "key": "preview",
+          "value": "string"
+        },
+        {
+          "key": "releaseDate",
+          "value": "string"
+        },
+        {
+          "key": "title",
+          "value": "string"
+        },
+        {
+          "key": "trackNumber",
+          "value": "number"
+        },
+        {
+          "key": "type",
+          "value": "string"
+        },
+        {
+          "key": "uri",
+          "value": "string"
+        }
+      ]
+    }
+  ]
+}

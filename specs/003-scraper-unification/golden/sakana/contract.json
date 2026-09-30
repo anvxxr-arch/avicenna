@@ -1,0 +1,14 @@
+{
+  "scraper": "sakana",
+  "capturedAt": "2026-09-30T01:14:24.253Z",
+  "cases": [
+    {
+      "args": [
+        "models"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "requires SAKANA_FIREBASE_KEY; the actionable env error is the contract"
+    }
+  ]
+}

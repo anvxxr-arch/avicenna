@@ -1,0 +1,189 @@
+{
+  "scraper": "otakudesu",
+  "capturedAt": "2026-09-30T01:14:23.882Z",
+  "cases": [
+    {
+      "args": [
+        "home"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "date",
+                    "value": "string"
+                  },
+                  {
+                    "key": "day",
+                    "value": "string"
+                  },
+                  {
+                    "key": "episode",
+                    "value": "string"
+                  },
+                  {
+                    "key": "poster",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "ongoing",
+        "1"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "date",
+                    "value": "string"
+                  },
+                  {
+                    "key": "day",
+                    "value": "string"
+                  },
+                  {
+                    "key": "episode",
+                    "value": "string"
+                  },
+                  {
+                    "key": "poster",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genrelist"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "../etc"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "traversal slug must be rejected"
+    }
+  ]
+}

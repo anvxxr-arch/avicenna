@@ -1,0 +1,221 @@
+{
+  "scraper": "yt",
+  "capturedAt": "2026-09-30T01:14:34.990Z",
+  "cases": [
+    {
+      "args": [
+        "search",
+        "lofi hip hop"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "estimatedResults",
+          "value": "string"
+        },
+        {
+          "key": "hasMore",
+          "value": "boolean"
+        },
+        {
+          "key": "page",
+          "value": "number"
+        },
+        {
+          "key": "query",
+          "value": "string"
+        },
+        {
+          "key": "results",
+          "value": [
+            [
+              {
+                "key": "channel",
+                "value": "string"
+              },
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              },
+              {
+                "key": "views",
+                "value": "string"
+              }
+            ],
+            [
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              },
+              {
+                "key": "videoCount",
+                "value": "string"
+              }
+            ],
+            [
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "args": [
+        "info",
+        "dQw4w9WgXcQ"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "author",
+          "value": "string"
+        },
+        {
+          "key": "category",
+          "value": "string"
+        },
+        {
+          "key": "channelId",
+          "value": "string"
+        },
+        {
+          "key": "description",
+          "value": "string"
+        },
+        {
+          "key": "durationSeconds",
+          "value": "number"
+        },
+        {
+          "key": "id",
+          "value": "string"
+        },
+        {
+          "key": "isFamilySafe",
+          "value": "boolean"
+        },
+        {
+          "key": "isLive",
+          "value": "boolean"
+        },
+        {
+          "key": "keywords",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "playability",
+          "value": "string"
+        },
+        {
+          "key": "publishDate",
+          "value": "string"
+        },
+        {
+          "key": "thumbnail",
+          "value": "string"
+        },
+        {
+          "key": "title",
+          "value": "string"
+        },
+        {
+          "key": "type",
+          "value": "string"
+        },
+        {
+          "key": "uploadDate",
+          "value": "string"
+        },
+        {
+          "key": "viewCount",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "related",
+        "dQw4w9WgXcQ"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "results",
+          "value": [
+            [
+              {
+                "key": "channel",
+                "value": "string"
+              },
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              },
+              {
+                "key": "views",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "videoId",
+          "value": "string"
+        }
+      ]
+    }
+  ]
+}

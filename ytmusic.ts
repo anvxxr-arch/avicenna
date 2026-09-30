@@ -61,11 +61,32 @@ async function post(endpoint: string, body: Record<string, unknown>): Promise<Re
   return res.json() as Promise<Record<string, unknown>>;
 }
 
-const runsToText = (runs: Array<{ text?: string }> | undefined | null): string =>
-  (runs || []).map((r) => r.text || '').join('');
-
 type Rec = Record<string, unknown>;
+type Run = { text?: string };
+type PathKey = string | number;
 const get = <T>(o: unknown, k: string): T | undefined => ((o as Rec)?.[k] as T) ?? undefined;
+/** Walks a key/index path down an unknown JSON node; missing links yield undefined. */
+const at = (o: unknown, ...keys: PathKey[]): unknown =>
+  keys.reduce<unknown>((acc, k) => get<unknown>(acc, String(k)), o);
+/** Object at `keys`, or undefined when the value is missing or not an object. */
+const asRec = (o: unknown, ...keys: PathKey[]): Rec | undefined => {
+  const v = at(o, ...keys);
+  return typeof v === 'object' && v !== null ? (v as Rec) : undefined;
+};
+/** Array at `keys`, or undefined when the value is missing or not an array. */
+const asList = <T = Rec>(o: unknown, ...keys: PathKey[]): T[] | undefined => {
+  const v = at(o, ...keys);
+  return Array.isArray(v) ? (v as T[]) : undefined;
+};
+/** String at `keys`, or undefined when the value is missing or not a string. */
+const asStr = (o: unknown, ...keys: PathKey[]): string | undefined => {
+  const v = at(o, ...keys);
+  return typeof v === 'string' ? v : undefined;
+};
+/** Runs of a text field (e.g. `text`, `title`); empty when absent. */
+const asRuns = (o: unknown, ...keys: PathKey[]): Run[] => asList<Run>(o, ...keys, 'runs') || [];
+const runsToText = (runs: Run[] | undefined | null): string =>
+  (runs || []).map((r) => r.text || '').join('');
 
 function getThumbnails(renderer: unknown): string[] {
   const r = renderer as Rec | undefined;
@@ -78,25 +99,22 @@ function getThumbnails(renderer: unknown): string[] {
 
 function getVideoId(item: unknown): string | null {
   const it = item as Rec;
-  const flex0 = get<Rec>(get<Array<Rec>>(it, 'flexColumns')?.[0], 'musicResponsiveListItemFlexColumnRenderer');
-  const runs = get<Array<Rec>>(get<Rec>(flex0, 'text'), 'runs') || [];
-  const watchId = get<Rec>(get<Rec>(runs[0], 'navigationEndpoint'), 'watchEndpoint')?.videoId;
-  if (watchId) return watchId as string;
-  const items = get<Array<Rec>>(get<Rec>(it, 'menu'), 'items') || [];
-  for (const mi of items) {
-    const id = get<string>(get<Rec>(get<Rec>(get<Rec>(mi, 'menuServiceItemRenderer'), 'serviceEndpoint'), 'queueAddEndpoint'), 'queueTarget')?.videoId;
+  const flex0 = asRec(asList(it, 'flexColumns')?.[0], 'musicResponsiveListItemFlexColumnRenderer');
+  const watchId = asStr(asRuns(flex0, 'text')[0], 'navigationEndpoint', 'watchEndpoint', 'videoId');
+  if (watchId) return watchId;
+  for (const mi of asList(it, 'menu', 'items') || []) {
+    const id = asStr(mi, 'menuServiceItemRenderer', 'serviceEndpoint', 'queueAddEndpoint', 'queueTarget', 'videoId');
     if (id) return id;
   }
-  return (get<Rec>(it, 'navigationEndpoint')?.watchEndpoint as Rec)?.videoId as string || null;
+  return asStr(it, 'navigationEndpoint', 'watchEndpoint', 'videoId') || null;
 }
 
 function getBrowseId(item: unknown): string | null {
   const it = item as Rec;
-  const nav = get<Rec>(get<Rec>(it, 'navigationEndpoint'), 'browseEndpoint')?.browseId;
-  if (nav) return nav as string;
-  const items = get<Array<Rec>>(get<Rec>(it, 'menu'), 'items') || [];
-  for (const mi of items) {
-    const id = get<string>(get<Rec>(get<Rec>(get<Rec>(mi, 'menuServiceItemRenderer'), 'serviceEndpoint'), 'browseEndpoint'), 'browseId');
+  const nav = asStr(it, 'navigationEndpoint', 'browseEndpoint', 'browseId');
+  if (nav) return nav;
+  for (const mi of asList(it, 'menu', 'items') || []) {
+    const id = asStr(mi, 'menuServiceItemRenderer', 'serviceEndpoint', 'browseEndpoint', 'browseId');
     if (id) return id;
   }
   return null;
@@ -104,33 +122,33 @@ function getBrowseId(item: unknown): string | null {
 
 function getArtists(item: unknown): Array<{ name: string; id: string }> {
   const it = item as Rec;
-  const runs = get<Array<Rec>>(get<Rec>(get<Array<Rec>>(it, 'flexColumns')?.[1], 'musicResponsiveListItemFlexColumnRenderer'), 'text')?.runs || [];
-  return (runs as Array<Rec>)
-    .filter((r) => String(get<Rec>(get<Rec>(r, 'navigationEndpoint'), 'browseEndpoint')?.browseId).startsWith('UC'))
-    .map((r) => ({ name: r.text as string, id: (get<Rec>(get<Rec>(r, 'navigationEndpoint'), 'browseEndpoint')?.browseId) as string }));
+  const runs = asRuns(asRec(asList(it, 'flexColumns')?.[1], 'musicResponsiveListItemFlexColumnRenderer'), 'text');
+  return runs
+    .filter((r) => (asStr(r, 'navigationEndpoint', 'browseEndpoint', 'browseId') || '').startsWith('UC'))
+    .map((r) => ({ name: r.text as string, id: asStr(r, 'navigationEndpoint', 'browseEndpoint', 'browseId') as string }));
 }
 
 function getAlbum(item: unknown): { name: string; id: string } | null {
   const it = item as Rec;
-  const runs = get<Array<Rec>>(get<Rec>(get<Array<Rec>>(it, 'flexColumns')?.[1], 'musicResponsiveListItemFlexColumnRenderer'), 'text')?.runs || [];
-  const run = (runs as Array<Rec>).find((r) => String(get<Rec>(get<Rec>(r, 'navigationEndpoint'), 'browseEndpoint')?.browseId).startsWith('MPREb'));
-  return run ? { name: run.text as string, id: get<Rec>(get<Rec>(run, 'navigationEndpoint'), 'browseEndpoint')?.browseId as string } : null;
+  const runs = asRuns(asRec(asList(it, 'flexColumns')?.[1], 'musicResponsiveListItemFlexColumnRenderer'), 'text');
+  const run = runs.find((r) => (asStr(r, 'navigationEndpoint', 'browseEndpoint', 'browseId') || '').startsWith('MPREb'));
+  return run ? { name: run.text as string, id: asStr(run, 'navigationEndpoint', 'browseEndpoint', 'browseId') as string } : null;
 }
 
 function getPlays(flex: Array<Rec> | undefined): string | null {
-  const t = runsToText(get<Rec>(flex?.[2], 'musicResponsiveListItemFlexColumnRenderer')?.text?.runs);
+  const t = runsToText(asRuns(asRec(flex?.[2], 'musicResponsiveListItemFlexColumnRenderer'), 'text'));
   return /plays|views/i.test(t) ? t : null;
 }
 
 function parseTrack(item: unknown): Record<string, unknown> | null {
   if (!item) return null;
   const it = item as Rec;
-  const flex = get<Array<Rec>>(it, 'flexColumns') || [];
+  const flex = asList(it, 'flexColumns') || [];
   return {
-    title: runsToText(get<Rec>(flex[0], 'musicResponsiveListItemFlexColumnRenderer')?.text?.runs),
+    title: runsToText(asRuns(asRec(flex[0], 'musicResponsiveListItemFlexColumnRenderer'), 'text')),
     artists: getArtists(it),
     album: getAlbum(it),
-    duration: runsToText(get<Rec>(get<Array<Rec>>(it, 'fixedColumns')?.[0], 'musicResponsiveListItemFixedColumnRenderer')?.text?.runs),
+    duration: runsToText(asRuns(asRec(asList(it, 'fixedColumns')?.[0], 'musicResponsiveListItemFixedColumnRenderer'), 'text')),
     plays: getPlays(flex),
     videoId: getVideoId(it),
   };
@@ -139,12 +157,12 @@ function parseTrack(item: unknown): Record<string, unknown> | null {
 function parseSearchItem(item: unknown, shelfType: string | null): Record<string, unknown> | null {
   if (!item) return null;
   const it = item as Rec;
-  const flex = get<Array<Rec>>(it, 'flexColumns') || [];
-  const title = runsToText(get<Rec>(flex[0], 'musicResponsiveListItemFlexColumnRenderer')?.text?.runs);
-  const subtitle = runsToText(get<Rec>(flex[1], 'musicResponsiveListItemFlexColumnRenderer')?.text?.runs);
+  const flex = asList(it, 'flexColumns') || [];
+  const title = runsToText(asRuns(asRec(flex[0], 'musicResponsiveListItemFlexColumnRenderer'), 'text'));
+  const subtitle = runsToText(asRuns(asRec(flex[1], 'musicResponsiveListItemFlexColumnRenderer'), 'text'));
   const resultType = shelfType || TYPE_BY_LABEL[subtitle.split(' • ')[0]] || null;
   const duration =
-    runsToText(get<Rec>(get<Array<Rec>>(it, 'fixedColumns')?.[0], 'musicResponsiveListItemFixedColumnRenderer')?.text?.runs)
+    runsToText(asRuns(asRec(asList(it, 'fixedColumns')?.[0], 'musicResponsiveListItemFixedColumnRenderer'), 'text'))
     || (resultType === 'song' && /\d+:\d+$/.test(subtitle) ? subtitle.split(' • ').pop()! : null);
 
   const out: Rec = {
@@ -163,18 +181,18 @@ function parseSearchItem(item: unknown, shelfType: string | null): Record<string
 
 function parseTopResult(card: unknown): Rec {
   const c = card as Rec;
-  const subtitle = runsToText(get<Rec>(c, 'subtitle')?.runs);
+  const subtitle = runsToText(asRuns(c, 'subtitle'));
   const parts = subtitle.split(' • ');
-  const onTap = get<Rec>(c, 'onTap') || get<Rec>(get<Rec>(get<Rec>(c, 'title'), 'runs')?.[0], 'navigationEndpoint') || {};
+  const onTap = asRec(c, 'onTap') || asRec(asRuns(c, 'title')[0], 'navigationEndpoint') || {};
   return {
     category: 'Top result',
     resultType: TYPE_BY_LABEL[parts[0]] || null,
-    title: runsToText(get<Rec>(c, 'title')?.runs),
+    title: runsToText(asRuns(c, 'title')),
     subtitle,
-    videoId: (get<Rec>(onTap, 'watchEndpoint')?.videoId as string) || null,
-    browseId: (get<Rec>(onTap, 'browseEndpoint')?.browseId as string) || null,
+    videoId: asStr(onTap, 'watchEndpoint', 'videoId') || null,
+    browseId: asStr(onTap, 'browseEndpoint', 'browseId') || null,
     thumbnails: getThumbnails(get(c, 'thumbnail')),
-    songs: (get<Array<Rec>>(c, 'contents') || [])
+    songs: (asList(c, 'contents') || [])
       .map((x) => parseSearchItem(get(x, 'musicResponsiveListItemRenderer'), null))
       .filter(Boolean),
   };
@@ -184,10 +202,10 @@ async function search(query: string, filter?: string): Promise<Rec> {
   const body: Rec = { query };
   if (filter && FILTERS[filter]) body.params = FILTERS[filter];
   const json = await post('search', body);
-  const tabs = get<Array<Rec>>(get<Rec>(json, 'contents'), 'tabbedSearchResultsRenderer')?.tabs || [];
-  const tab0 = tabs[0] ? get<Rec>(tabs[0], 'tabRenderer') : undefined;
-  const content = tab0 ? get<Rec>(tab0, 'content') : undefined;
-  const sections = content ? get<Array<Rec>>(content, 'sectionListRenderer')?.contents || [] : [];
+  const tabs = asList(asRec(json, 'contents', 'tabbedSearchResultsRenderer'), 'tabs') || [];
+  const tab0 = tabs[0] ? asRec(tabs[0], 'tabRenderer') : undefined;
+  const content = tab0 ? asRec(tab0, 'content') : undefined;
+  const sections = content ? asList(content, 'sectionListRenderer', 'contents') || [] : [];
   const results: Rec[] = [];
 
   for (const section of sections) {
@@ -195,9 +213,9 @@ async function search(query: string, filter?: string): Promise<Rec> {
       results.push(parseTopResult(get(section, 'musicCardShelfRenderer')));
       continue;
     }
-    const shelf = get<Rec>(section, 'musicShelfRenderer');
-    const shelfType = shelf ? TYPE_BY_SHELF[runsToText(get<Rec>(shelf, 'title')?.runs)] || null : null;
-    const items = get<Array<Rec>>(shelf, 'contents') || get<Array<Rec>>(get<Rec>(section, 'itemSectionRenderer'), 'contents') || [];
+    const shelf = asRec(section, 'musicShelfRenderer');
+    const shelfType = shelf ? TYPE_BY_SHELF[runsToText(asRuns(shelf, 'title'))] || null : null;
+    const items = asList(shelf, 'contents') || asList(section, 'itemSectionRenderer', 'contents') || [];
     for (const item of items) {
       const parsed = parseSearchItem(get(item, 'musicResponsiveListItemRenderer'), shelfType);
       if (!parsed) continue;
@@ -216,37 +234,37 @@ async function info(browseId: string): Promise<Rec> {
 }
 
 function getHeader(json: unknown): Rec | null {
-  const two = get<Rec>(get<Rec>(json, 'contents'), 'twoColumnBrowseResultsRenderer');
-  const sections = get<Array<Rec>>(get<Rec>(get<Array<Rec>>(get<Rec>(two, 'tabs')?.[0], 'tabRenderer'), 'content'), 'sectionListRenderer')?.contents || [];
+  const two = asRec(json, 'contents', 'twoColumnBrowseResultsRenderer');
+  const sections = asList(asRec(asList(two, 'tabs')?.[0], 'tabRenderer', 'content'), 'sectionListRenderer', 'contents') || [];
   return (
-    sections.find((s) => get(s, 'musicResponsiveHeaderRenderer'))?.musicResponsiveHeaderRenderer
-    || sections.find((s) => get(s, 'musicDetailHeaderRenderer'))?.musicDetailHeaderRenderer
-    || sections.find((s) => get(s, 'musicEditablePlaylistDetailHeaderRenderer'))?.musicEditablePlaylistDetailHeaderRenderer
+    asRec(sections.find((s) => get(s, 'musicResponsiveHeaderRenderer')), 'musicResponsiveHeaderRenderer')
+    || asRec(sections.find((s) => get(s, 'musicDetailHeaderRenderer')), 'musicDetailHeaderRenderer')
+    || asRec(sections.find((s) => get(s, 'musicEditablePlaylistDetailHeaderRenderer')), 'musicEditablePlaylistDetailHeaderRenderer')
     || null
   );
 }
 
 function getSecondarySections(json: unknown): Array<Rec> {
-  const two = get<Rec>(get<Rec>(json, 'contents'), 'twoColumnBrowseResultsRenderer');
-  return get<Rec>(get<Rec>(two, 'secondaryContents'), 'sectionListRenderer')?.contents || [];
+  const two = asRec(json, 'contents', 'twoColumnBrowseResultsRenderer');
+  return asList(two, 'secondaryContents', 'sectionListRenderer', 'contents') || [];
 }
 
 function getShelfItems(sections: Array<Rec>): Array<Rec> {
-  return sections.flatMap((s) => get<Array<Rec>>(get(s, 'musicShelfRenderer'), 'contents') || get<Array<Rec>>(get(s, 'musicPlaylistShelfRenderer'), 'contents') || []);
+  return sections.flatMap((s) => asList(s, 'musicShelfRenderer', 'contents') || asList(s, 'musicPlaylistShelfRenderer', 'contents') || []);
 }
 
 function parseAlbum(json: unknown): Rec {
   const header = getHeader(json);
-  const subtitle = runsToText(get<Rec>(header, 'subtitle')?.runs).split(' • ');
+  const subtitle = runsToText(asRuns(header, 'subtitle')).split(' • ');
   const tracks = getShelfItems(getSecondarySections(json))
     .map((c) => parseTrack(get(c, 'musicResponsiveListItemRenderer')))
     .filter(Boolean);
   return {
     type: 'album',
-    title: runsToText(get<Rec>(header, 'title')?.runs),
-    artist: runsToText(get<Rec>(header, 'straplineTextOne')?.runs),
+    title: runsToText(asRuns(header, 'title')),
+    artist: runsToText(asRuns(header, 'straplineTextOne')),
     year: subtitle[1] || null,
-    description: runsToText(get<Rec>(header, 'description')?.runs),
+    description: runsToText(asRuns(header, 'description')),
     thumbnails: getThumbnails(get(header, 'thumbnail')),
     trackCount: tracks.length,
     tracks,
@@ -260,9 +278,9 @@ function parsePlaylist(json: unknown): Rec {
     .filter(Boolean);
   return {
     type: 'playlist',
-    title: runsToText(get<Rec>(header, 'title')?.runs),
-    description: runsToText(get<Rec>(header, 'description')?.runs),
-    stats: runsToText(get<Rec>(header, 'secondSubtitle')?.runs),
+    title: runsToText(asRuns(header, 'title')),
+    description: runsToText(asRuns(header, 'description')),
+    stats: runsToText(asRuns(header, 'secondSubtitle')),
     thumbnails: getThumbnails(get(header, 'thumbnail')),
     trackCount: tracks.length,
     tracks,
@@ -271,16 +289,16 @@ function parsePlaylist(json: unknown): Rec {
 
 function parseCarousel(carousel: unknown): Rec {
   const c = carousel as Rec;
-  const title = runsToText(get<Rec>(get<Rec>(c, 'header'), 'musicCarouselShelfBasicHeaderRenderer')?.title?.runs);
-  const items = (get<Array<Rec>>(c, 'contents') || [])
+  const title = runsToText(asRuns(asRec(c, 'header', 'musicCarouselShelfBasicHeaderRenderer'), 'title'));
+  const items = (asList(c, 'contents') || [])
     .map((x) => {
-      const item = (get(x, 'musicTwoRowItemRenderer') || get(x, 'musicMultiRowListItemRenderer')) as Rec | undefined;
+      const item = asRec(x, 'musicTwoRowItemRenderer') || asRec(x, 'musicMultiRowListItemRenderer');
       if (!item) return null;
       return {
-        title: runsToText(get<Rec>(item, 'title')?.runs),
-        subtitle: runsToText(get<Rec>(item, 'subtitle')?.runs),
-        browseId: (get<Rec>(get<Rec>(item, 'navigationEndpoint'), 'browseEndpoint')?.browseId as string) || null,
-        videoId: (get<Rec>(get<Rec>(item, 'navigationEndpoint'), 'watchEndpoint')?.videoId as string) || null,
+        title: runsToText(asRuns(item, 'title')),
+        subtitle: runsToText(asRuns(item, 'subtitle')),
+        browseId: asStr(item, 'navigationEndpoint', 'browseEndpoint', 'browseId') || null,
+        videoId: asStr(item, 'navigationEndpoint', 'watchEndpoint', 'videoId') || null,
         thumbnails: getThumbnails(get(item, 'thumbnailRenderer')),
       };
     })
@@ -289,25 +307,25 @@ function parseCarousel(carousel: unknown): Rec {
 }
 
 function parseArtist(json: unknown, browseId: string): Rec {
-  const slr = get<Rec>(get<Rec>(get<Array<Rec>>(get<Rec>(get<Rec>(json, 'contents'), 'singleColumnBrowseResultsRenderer'), 'tabs')?.[0], 'tabRenderer'), 'content')?.sectionListRenderer;
-  const sections = slr?.contents || [];
+  const slr = asRec(json, 'contents', 'singleColumnBrowseResultsRenderer', 'tabs');
+  const sections = asList(asRec(asList(slr)?.[0], 'tabRenderer', 'content'), 'sectionListRenderer', 'contents') || [];
 
-  const topSongsShelf = sections.find((s) => get(s, 'musicShelfRenderer'))?.musicShelfRenderer;
-  const songs = (get<Array<Rec>>(topSongsShelf, 'contents') || [])
+  const topSongsShelf = asRec(sections.find((s) => get(s, 'musicShelfRenderer')), 'musicShelfRenderer');
+  const songs = (asList(topSongsShelf, 'contents') || [])
     .map((c) => parseTrack(get(c, 'musicResponsiveListItemRenderer')))
     .filter(Boolean);
 
-  const descriptionShelf = sections.find((s) => get(s, 'musicDescriptionShelfRenderer'))?.musicDescriptionShelfRenderer;
+  const descriptionShelf = asRec(sections.find((s) => get(s, 'musicDescriptionShelfRenderer')), 'musicDescriptionShelfRenderer');
   const name =
     songs.find((s) => (s.artists as Array<{ id: string }>)?.some((a) => a.id === browseId))?.artists?.find((a) => a.id === browseId)?.name
-    || runsToText(get<Rec>(descriptionShelf, 'header')?.runs)
+    || runsToText(asRuns(descriptionShelf, 'header'))
     || null;
 
   return {
     type: 'artist',
     name,
-    description: runsToText(get<Rec>(descriptionShelf, 'description')?.runs),
-    views: runsToText(get<Rec>(descriptionShelf, 'subheader')?.runs) || null,
+    description: runsToText(asRuns(descriptionShelf, 'description')),
+    views: runsToText(asRuns(descriptionShelf, 'subheader')) || null,
     songs,
     sections: sections
       .filter((s) => get(s, 'musicCarouselShelfRenderer'))
@@ -317,42 +335,42 @@ function parseArtist(json: unknown, browseId: string): Rec {
 
 async function lyrics(videoId: string, depth = 0): Promise<Rec> {
   const json = await post('next', { videoId, isAudioOnly: true });
-  const watch = get<Rec>(get<Rec>(json, 'contents'), 'singleColumnMusicWatchNextResultsRenderer')?.tabbedRenderer as Rec | undefined;
-  const tabs = get<Array<Rec>>(watch?.watchNextTabbedResultsRenderer, 'tabs') || [];
+  const watch = asRec(json, 'contents', 'singleColumnMusicWatchNextResultsRenderer', 'tabbedRenderer');
+  const tabs = asList(watch, 'watchNextTabbedResultsRenderer', 'tabs') || [];
   const lyricsTab = tabs.find((t) => {
-    const ep = get<Rec>(get<Rec>(t, 'tabRenderer'), 'endpoint');
-    const cfg = get<Rec>(get<Rec>(ep, 'browseEndpoint'), 'browseEndpointContextSupportedConfigs');
-    return get<string>(get<Rec>(cfg, 'browseEndpointContextMusicConfig'), 'pageType') === 'MUSIC_PAGE_TYPE_TRACK_LYRICS';
+    const ep = asRec(t, 'tabRenderer', 'endpoint');
+    const cfg = asRec(ep, 'browseEndpoint', 'browseEndpointContextSupportedConfigs');
+    return asStr(cfg, 'browseEndpointContextMusicConfig', 'pageType') === 'MUSIC_PAGE_TYPE_TRACK_LYRICS';
   });
-  const lyricsBrowseId = get<string>(get<Rec>(get<Rec>(lyricsTab, 'tabRenderer'), 'endpoint'), 'browseEndpoint')?.browseId;
+  const lyricsBrowseId = asStr(lyricsTab, 'tabRenderer', 'endpoint', 'browseEndpoint', 'browseId');
 
   if (!lyricsBrowseId) {
     return depth > 0 ? { videoId, lyrics: null, source: null } : lyricsFallback(videoId);
   }
 
   const lyricsJson = await post('browse', { browseId: lyricsBrowseId });
-  const contents = get<Array<Rec>>(get<Rec>(lyricsJson, 'contents'), 'sectionListRenderer')?.contents || [];
-  const shelf = contents.find((s) => get(s, 'musicDescriptionShelfRenderer'))?.musicDescriptionShelfRenderer;
+  const contents = asList(lyricsJson, 'contents', 'sectionListRenderer', 'contents') || [];
+  const shelf = asRec(contents.find((s) => get(s, 'musicDescriptionShelfRenderer')), 'musicDescriptionShelfRenderer');
 
-  const text = runsToText(get<Rec>(shelf, 'description')?.runs);
+  const text = runsToText(asRuns(shelf, 'description'));
   if (text) {
-    return { videoId, lyrics: text, source: runsToText(get<Rec>(shelf, 'footer')?.runs) || null };
+    return { videoId, lyrics: text, source: runsToText(asRuns(shelf, 'footer')) || null };
   }
   return depth > 0 ? { videoId, lyrics: null, source: null } : lyricsFallback(videoId);
 }
 
 async function findSongVideoId(videoId: string): Promise<string | null> {
   const json = await post('next', { videoId, isAudioOnly: true });
-  const watch = get<Rec>(get<Rec>(json, 'contents'), 'singleColumnMusicWatchNextResultsRenderer')?.tabbedRenderer as Rec | undefined;
-  const tabs = get<Array<Rec>>(watch?.watchNextTabbedResultsRenderer, 'tabs') || [];
-  const tab0 = tabs[0] ? get<Rec>(tabs[0], 'tabRenderer') : undefined;
-  const queue = get<Rec>(get<Rec>(tab0?.content, 'musicQueueRenderer'), 'content')?.playlistPanelRenderer;
-  const contents = get<Array<Rec>>(queue, 'contents') || [];
+  const watch = asRec(json, 'contents', 'singleColumnMusicWatchNextResultsRenderer', 'tabbedRenderer');
+  const tabs = asList(watch, 'watchNextTabbedResultsRenderer', 'tabs') || [];
+  const tab0 = tabs[0] ? asRec(tabs[0], 'tabRenderer') : undefined;
+  const queue = asRec(tab0, 'content', 'musicQueueRenderer', 'content', 'playlistPanelRenderer');
+  const contents = asList(queue, 'contents') || [];
   const track =
-    (contents.find((c) => get(get<Rec>(c, 'playlistPanelVideoRenderer'), 'selected'))?.playlistPanelVideoRenderer)
-    || get<Rec>(contents[0], 'playlistPanelVideoRenderer');
-  const title = runsToText(get<Rec>(track, 'title')?.runs).replace(/\s*\([^)]*\)\s*$/g, '');
-  const artistName = runsToText(get<Rec>(track, 'shortBylineText')?.runs);
+    asRec(contents.find((c) => get(asRec(c, 'playlistPanelVideoRenderer'), 'selected')), 'playlistPanelVideoRenderer')
+    || asRec(contents[0], 'playlistPanelVideoRenderer');
+  const title = runsToText(asRuns(track, 'title')).replace(/\s*\([^)]*\)\s*$/g, '');
+  const artistName = runsToText(asRuns(track, 'shortBylineText'));
   const query = `${title} ${artistName}`.trim();
   if (!query) return null;
 
@@ -372,21 +390,21 @@ async function lyricsFallback(videoId: string): Promise<Rec> {
 
 async function related(videoId: string): Promise<Rec> {
   const json = await post('next', { playlistId: 'RDAMVM' + videoId, isAudioOnly: true });
-  const watch = get<Rec>(get<Rec>(json, 'contents'), 'singleColumnMusicWatchNextResultsRenderer')?.tabbedRenderer as Rec | undefined;
-  const tabs = get<Array<Rec>>(watch?.watchNextTabbedResultsRenderer, 'tabs') || [];
-  const queue =
-    tabs.find((t) => get<Rec>(t, 'tabRenderer')?.title === 'Up next')?.tabRenderer?.content?.musicQueueRenderer?.content?.playlistPanelRenderer;
+  const watch = asRec(json, 'contents', 'singleColumnMusicWatchNextResultsRenderer', 'tabbedRenderer');
+  const tabs = asList(watch, 'watchNextTabbedResultsRenderer', 'tabs') || [];
+  const queueTab = tabs.find((t) => asStr(t, 'tabRenderer', 'title') === 'Up next');
+  const queue = asRec(queueTab, 'tabRenderer', 'content', 'musicQueueRenderer', 'content', 'playlistPanelRenderer');
 
-  const tracks = (get<Array<Rec>>(queue, 'contents') || [])
+  const tracks = (asList(queue, 'contents') || [])
     .map((c) => {
-      const v = get<Rec>(c, 'playlistPanelVideoRenderer');
+      const v = asRec(c, 'playlistPanelVideoRenderer');
       if (!v) return null;
       return {
-        title: runsToText(get<Rec>(v, 'title')?.runs),
-        artists: (get<Array<Rec>>(v, 'longBylineText')?.runs || [])
-          .filter((r) => String(get<Rec>(get<Rec>(r, 'navigationEndpoint'), 'browseEndpoint')?.browseId).startsWith('UC'))
-          .map((r) => ({ name: r.text as string, id: get<Rec>(get<Rec>(r, 'navigationEndpoint'), 'browseEndpoint')?.browseId as string })),
-        duration: runsToText(get<Rec>(v, 'lengthText')?.runs),
+        title: runsToText(asRuns(v, 'title')),
+        artists: asRuns(v, 'longBylineText')
+          .filter((r) => (asStr(r, 'navigationEndpoint', 'browseEndpoint', 'browseId') || '').startsWith('UC'))
+          .map((r) => ({ name: r.text as string, id: asStr(r, 'navigationEndpoint', 'browseEndpoint', 'browseId') as string })),
+        duration: runsToText(asRuns(v, 'lengthText')),
         videoId: v.videoId,
         selected: v.selected || false,
         thumbnails: getThumbnails(get(v, 'thumbnail')),
@@ -418,7 +436,7 @@ async function download(videoId: string, depth = 0): Promise<Rec> {
     playbackContext: { contentPlaybackContext: { signatureTimestamp } },
   });
 
-  const status = get<Rec>(json, 'playabilityStatus')?.status;
+  const status = asStr(json, 'playabilityStatus', 'status');
   if (status !== 'OK') {
     if (depth === 0) {
       const songVideoId = await findSongVideoId(videoId);
@@ -427,18 +445,18 @@ async function download(videoId: string, depth = 0): Promise<Rec> {
         if (resolved.status === 'OK') return { ...resolved, videoId };
       }
     }
-    const ps = get<Rec>(json, 'playabilityStatus') || {};
+    const ps = asRec(json, 'playabilityStatus') || {};
     return {
       videoId,
       status,
-      reason: ps.reason || runsToText(get<Rec>(get<Rec>(ps, 'errorScreen'), 'playerErrorMessageRenderer')?.reason?.runs) || null,
+      reason: ps.reason || runsToText(asRuns(asRec(ps, 'errorScreen', 'playerErrorMessageRenderer'), 'reason')) || null,
     };
   }
 
-  const sd = get<Rec>(json, 'streamingData') || {};
+  const sd = asRec(json, 'streamingData') || {};
   const formats = [
-    ...((sd.formats as Array<Rec>) || []),
-    ...((sd.adaptiveFormats as Array<Rec>) || []),
+    ...asList(sd, 'formats') || [],
+    ...asList(sd, 'adaptiveFormats') || [],
   ];
   const parseCipher = (cipher: unknown) => {
     if (!cipher) return null;

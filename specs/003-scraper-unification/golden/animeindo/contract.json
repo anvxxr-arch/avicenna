@@ -1,0 +1,397 @@
+{
+  "scraper": "animeindo",
+  "capturedAt": "2026-09-30T01:15:52.878Z",
+  "cases": [
+    {
+      "args": [
+        "genrelist"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "home",
+        "1"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "episode",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                },
+                {
+                  "key": "next",
+                  "value": "string"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "search",
+        "one piece"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "duration",
+                    "value": "string"
+                  },
+                  {
+                    "key": "labels",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "thumbnail",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  },
+                  {
+                    "key": "year",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "labels",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "thumbnail",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  },
+                  {
+                    "key": "year",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "labels",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "thumbnail",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "query",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "one-piece"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "description",
+              "value": "string"
+            },
+            {
+              "key": "episodes",
+              "value": [
+                [
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "image",
+              "value": "string"
+            },
+            {
+              "key": "title",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "supported"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "batch",
+              "value": "boolean"
+            },
+            {
+              "key": "detail",
+              "value": "boolean"
+            },
+            {
+              "key": "episode",
+              "value": "boolean"
+            },
+            {
+              "key": "genre",
+              "value": "boolean"
+            },
+            {
+              "key": "genreList",
+              "value": "boolean"
+            },
+            {
+              "key": "home",
+              "value": "boolean"
+            },
+            {
+              "key": "jadwal",
+              "value": "boolean"
+            },
+            {
+              "key": "movies",
+              "value": "boolean"
+            },
+            {
+              "key": "search",
+              "value": "boolean"
+            },
+            {
+              "key": "watch",
+              "value": "boolean"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genre",
+        "../../etc"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "traversal slug must be rejected"
+    }
+  ]
+}

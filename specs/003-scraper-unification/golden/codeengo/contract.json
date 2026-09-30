@@ -1,18 +1,15 @@
 {
   "scraper": "codeengo",
-  "base": "https://codeengo.com",
-  "legacy": "legacy/codeengo.js (3099 bytes, ESM, axios)",
-  "migrated": "codeengo.ts",
-  "commands": {
-    "generate <prompt>": "POST /text-to-image.php -> {success,image:dataURL}; decodes png, writes codeengo_<ts>.jpg, uploads to https://uguu.se/upload -> {files:[{url}]}"
-  },
-  "output_shape": {
-    "success": "boolean",
-    "localPath": "string (codeengo_<ts>.jpg)",
-    "url": "string|null (uguu mirror)",
-    "sizeKB": "number",
-    "_error_variant": "{success:false, error:string}"
-  },
-  "captured": "2026-09-10",
-  "note": "Legacy .js capture returned {error} — the upstream image API was unreachable at capture time, so no success-shape golden exists from legacy. Migrated version verified LIVE end-to-end: image generated (100KB) + uploaded (https://n.uguu.se/KZbnniwp.jpg). Shape above is the observed success contract."
+  "capturedAt": "2026-09-30T01:14:19.966Z",
+  "cases": [
+    {
+      "args": [
+        "styles"
+      ],
+      "exit": 0,
+      "shape": [
+        "string"
+      ]
+    }
+  ]
 }

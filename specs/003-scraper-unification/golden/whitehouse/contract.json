@@ -1,22 +1,456 @@
 {
   "scraper": "whitehouse",
-  "base": "https://www.whitehouse.gov",
-  "legacy": "legacy/whitehouse.js (12106 bytes, CJS)",
-  "migrated": "whitehouse.ts",
-  "commands": {
-    "home": "GET / -> {headline, deck, heroVideo, videoAccordion:[{title,url,video}], headings:[string], paragraphs:[string], url}",
-    "news": "GET /news/ -> listing",
-    "releases": "GET /releases/ -> listing",
-    "fact-sheets": "GET /fact-sheets/ -> listing",
-    "administration": "GET /administration/ -> {title, count, profiles:[{name,role,url,image,bio}]}",
-    "videos": "GET /videos/ -> {title, url, count, posts:[{title,url,thumbnail,duration,date,dateISO}], pagination}",
-    "search <keyword> [page]": "GET /?s=<kw>[&paged=<n>] -> {title,url,count,posts,filters:[{label,url,active}],pagination:{current,total,pages:[{number,url,current}],next}}",
-    "detail <url>": "GET <article> -> {url,title,category,categoryUrl,subcategory,byline,date,dateISO,eoNumber,sections,published,modified,wordCount,featuredImage,images,bodyText,bodyHtml}"
-  },
-  "output_shape": {
-    "listing_post": "{title:string, url:string, categories:[string], date:string, dateISO:string, thumbnail:null, postId:number}",
-    "detail": "{url,title,category,categoryUrl,subcategory,byline,date,dateISO,eoNumber,sections,published,modified,wordCount,featuredImage,images:[],bodyText:string,bodyHtml:string}"
-  },
-  "captured": "2026-09-10",
-  "verified": "shape-diff vs golden: 7/7 sections match (home, news, releases, fact-sheets, administration, videos, search) + detail live"
+  "capturedAt": "2026-09-30T01:14:31.437Z",
+  "cases": [
+    {
+      "args": [
+        "home"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "deck",
+          "value": "null"
+        },
+        {
+          "key": "headings",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "headline",
+          "value": "null"
+        },
+        {
+          "key": "heroVideo",
+          "value": "string"
+        },
+        {
+          "key": "paragraphs",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "url",
+          "value": "string"
+        },
+        {
+          "key": "videoAccordion",
+          "value": [
+            [
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              },
+              {
+                "key": "video",
+                "value": "string"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "args": [
+        "news"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "count",
+          "value": "number"
+        },
+        {
+          "key": "filters",
+          "value": [
+            [
+              {
+                "key": "active",
+                "value": "boolean"
+              },
+              {
+                "key": "label",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "pagination",
+          "value": [
+            {
+              "key": "current",
+              "value": "number"
+            },
+            {
+              "key": "next",
+              "value": "string"
+            },
+            {
+              "key": "pages",
+              "value": [
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "null"
+                  }
+                ],
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "total",
+              "value": "number"
+            }
+          ]
+        },
+        {
+          "key": "posts",
+          "value": [
+            [
+              {
+                "key": "categories",
+                "value": [
+                  "string"
+                ]
+              },
+              {
+                "key": "date",
+                "value": "string"
+              },
+              {
+                "key": "dateISO",
+                "value": "string"
+              },
+              {
+                "key": "postId",
+                "value": "number"
+              },
+              {
+                "key": "thumbnail",
+                "value": "null"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "title",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "videos"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "count",
+          "value": "number"
+        },
+        {
+          "key": "pagination",
+          "value": [
+            {
+              "key": "current",
+              "value": "number"
+            },
+            {
+              "key": "next",
+              "value": "string"
+            },
+            {
+              "key": "pages",
+              "value": [
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "null"
+                  }
+                ],
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "total",
+              "value": "number"
+            }
+          ]
+        },
+        {
+          "key": "posts",
+          "value": [
+            [
+              {
+                "key": "date",
+                "value": "string"
+              },
+              {
+                "key": "dateISO",
+                "value": "string"
+              },
+              {
+                "key": "duration",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "title",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "search",
+        "executive order"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "count",
+          "value": "number"
+        },
+        {
+          "key": "pagination",
+          "value": [
+            {
+              "key": "current",
+              "value": "number"
+            },
+            {
+              "key": "next",
+              "value": "string"
+            },
+            {
+              "key": "pages",
+              "value": [
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "null"
+                  }
+                ],
+                [
+                  {
+                    "key": "current",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "total",
+              "value": "number"
+            }
+          ]
+        },
+        {
+          "key": "posts",
+          "value": [
+            [
+              {
+                "key": "categories",
+                "value": [
+                  "<empty>"
+                ]
+              },
+              {
+                "key": "date",
+                "value": "null"
+              },
+              {
+                "key": "dateISO",
+                "value": "null"
+              },
+              {
+                "key": "postId",
+                "value": "number"
+              },
+              {
+                "key": "thumbnail",
+                "value": "null"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ],
+            [
+              {
+                "key": "categories",
+                "value": [
+                  "string"
+                ]
+              },
+              {
+                "key": "date",
+                "value": "string"
+              },
+              {
+                "key": "dateISO",
+                "value": "string"
+              },
+              {
+                "key": "postId",
+                "value": "number"
+              },
+              {
+                "key": "thumbnail",
+                "value": "null"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "query",
+          "value": "string"
+        },
+        {
+          "key": "typeFilters",
+          "value": [
+            [
+              {
+                "key": "checked",
+                "value": "boolean"
+              },
+              {
+                "key": "label",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "../etc"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "traversal must be rejected"
+    }
+  ]
 }

@@ -1,15 +1,18 @@
 {
   "scraper": "freeconvert",
-  "base": "https://api.freeconvert.com/v1",
-  "legacy": "legacy/freeconvert.js (3604 bytes, CJS, axios+form-data)",
-  "migrated": "freeconvert.ts",
-  "commands": {
-    "compress <file> [target%]": "GET /account/guest -> raw JWT (text/plain); POST /process/jobs {tasks:{import-1:import/upload, compress-1:compress, export-1:export/url}} with Bearer; upload file to task.result.form.url (multipart); poll GET /process/jobs/<id> until completed; download export URL"
-  },
-  "output_shape": {
-    "job": "{id, status, tasks:[{operation, status, result:{url|form:{url,parameters}}}]}",
-    "download": "{file, url, md5, bytes}"
-  },
-  "captured": "2026-09-10",
-  "note": "Migrated version verified LIVE END-TO-END: guest token -> job -> multipart upload -> compress (video_compress_quality_percentage) -> export -> download. compress 10890 -> 5201 bytes with target 40%. Auth goes as Bearer header; core postAjax takes optional extraHeaders (added in this task)."
+  "capturedAt": "2026-09-30T01:15:49.743Z",
+  "cases": [
+    {
+      "args": [
+        "help"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "kind",
+          "value": "string"
+        }
+      ]
+    }
+  ]
 }

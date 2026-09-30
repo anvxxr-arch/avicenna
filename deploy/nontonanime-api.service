@@ -22,7 +22,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/dwizzy/avicenna
+# the API performs no filesystem writes — the tree stays read-only
+ReadOnlyPaths=/home/dwizzy/avicenna
 
 [Install]
 WantedBy=default.target

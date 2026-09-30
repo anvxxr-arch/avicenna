@@ -86,6 +86,13 @@ function takeAvatar(avatar: unknown): string | null {
   return null;
 }
 
+function takeUrl(v: unknown): string | null {
+  const first: unknown = Array.isArray(v) ? v[v.length - 1] : v;
+  if (first && typeof first === 'object' && 'url' in first) {
+    return typeof first.url === 'string' ? first.url : null;
+  }
+  return typeof first === 'string' ? first : null;
+}
 function extractVideo(item: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!item) return null;
   const video = (item.video || {}) as Record<string, unknown>;
@@ -93,12 +100,10 @@ function extractVideo(item: Record<string, unknown> | null): Record<string, unkn
   const stats = (item.stats || {}) as Record<string, number>;
   const music = (item.music || {}) as Record<string, unknown>;
 
-  let play = video.playAddr as string | string[] | undefined;
-  let download = video.downloadAddr as string | string[] | undefined;
-  if (Array.isArray(play)) play = play.length ? (play[play.length - 1] as { url?: string }).url ?? null : null;
-  if (typeof play !== 'string') play = null;
-  if (Array.isArray(download)) download = download.length ? (download[download.length - 1] as { url?: string }).url ?? null : null;
-  if (typeof download !== 'string') download = null;
+  // playAddr/downloadAddr are `string` on most responses and `[{ url }]` on others;
+  // both (and null) are legal, so both stay untyped until takeUrl narrows them.
+  const play = takeUrl(video.playAddr);
+  const download = takeUrl(video.downloadAddr);
 
   const coverList = [video.cover, video.dynamicCover, video.originCover].filter(Boolean);
   let cover: string | null = coverList.length ? (coverList[0] as string) : null;

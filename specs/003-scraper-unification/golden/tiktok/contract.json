@@ -1,0 +1,90 @@
+{
+  "scraper": "tiktok",
+  "capturedAt": "2026-09-30T01:14:28.037Z",
+  "cases": [
+    {
+      "args": [
+        "user",
+        "nasa"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "avatar",
+          "value": "string"
+        },
+        {
+          "key": "bio",
+          "value": "string"
+        },
+        {
+          "key": "followers",
+          "value": "number"
+        },
+        {
+          "key": "following",
+          "value": "number"
+        },
+        {
+          "key": "hearts",
+          "value": "number"
+        },
+        {
+          "key": "likesCount",
+          "value": "number"
+        },
+        {
+          "key": "nickname",
+          "value": "string"
+        },
+        {
+          "key": "private",
+          "value": "boolean"
+        },
+        {
+          "key": "secUid",
+          "value": "string"
+        },
+        {
+          "key": "username",
+          "value": "string"
+        },
+        {
+          "key": "verified",
+          "value": "boolean"
+        },
+        {
+          "key": "videosCount",
+          "value": "number"
+        }
+      ]
+    },
+    {
+      "args": [
+        "video",
+        "https://www.tiktok.com/@user/video/1234567890123456789"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "error",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ],
+      "note": "unknown/rate-limited video returns an error payload"
+    },
+    {
+      "args": [
+        "video",
+        "not-a-url"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "malformed input must be rejected"
+    }
+  ]
+}

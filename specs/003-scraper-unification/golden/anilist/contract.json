@@ -1,0 +1,25 @@
+{
+  "scraper": "anilist",
+  "capturedAt": "2026-09-30T01:14:18.049Z",
+  "cases": [
+    {
+      "args": [
+        "populer"
+      ],
+      "exit": 0,
+      "shape": "null",
+      "note": "anilist.co is a Vue SPA with the GraphQL API disabled server-side"
+    },
+    {
+      "args": [
+        "search",
+        "naruto"
+      ],
+      "exit": 0,
+      "shape": [
+        "<empty>"
+      ],
+      "note": "same SPA/GraphQL limitation"
+    }
+  ]
+}

@@ -1,23 +1,166 @@
 {
   "scraper": "drowify",
-  "base": "https://drowify-music.biz.id",
-  "legacy": "legacy/drowify.js (3284 bytes)",
-  "migrated": "drowify.ts",
-  "commands": {
-    "suggest <q>": "GET /api/suggest?q= -> [string]",
-    "search <q>": "GET /api/search?q= -> {status, creator, result:{query, totalSongs, songs[], albums[], playlists[], artists[]}}",
-    "artist <id>": "GET /api/artist?id= -> {status, input:{id}, result:{artistId,name,thumbnails[],topSongs[],topAlbums[],topSingles[],topVideos[],playlists[],featuredOn[],similarArtists[]}}",
-    "album <id>": "GET /api/album?id= -> {status, creator, result:{id,title,description,thumbnails[],songs[]}}",
-    "lyrics <id>": "GET /api/lyrics?id= -> {status, input:{id}, result:{videoId,title,artist,album,source,lyrics:{type,lines[]}}}",
-    "audio <id>": "resolves playable stream URL"
-  },
-  "output_shape": {
-    "suggest": "[string]",
-    "search": "{status:boolean, creator:string, result:{query:string, totalSongs:number, songs:[{title,videoId,thumbnail,url,artist,artistId,album,albumId,duration}], albums:[{id,title,artist,albumType,year,cover}], playlists:[{id,title,artist,cover}], artists:[{id,title,artist,cover}]}}",
-    "artist": "{status:boolean, input:{id:string}, result:{artistId,name,thumbnails:[{url,width,height}],topSongs:[{videoId,title,artist,thumbnails}],topAlbums:[{name,artist,browseId,thumbnails}],topSingles,topVideos,playlists,featuredOn,similarArtists}}",
-    "album": "{status:boolean, creator:string, result:{id,title,description,thumbnails:[{url,width,height}],songs:[{videoId,title,artist,artistId,duration,thumbnails}]}}",
-    "lyrics": "{status:boolean, input:{id:string}, result:{videoId,title,artist,album,source,lyrics:{type,lines}}}"
-  },
-  "captured": "2026-09-10",
-  "verified": "shape-diff vs golden: 5/5 commands match (suggest, search, artist, album, lyrics); audio command live; guards exit 1 on unknown cmd / missing arg, exit 0 on help"
+  "capturedAt": "2026-09-30T01:14:21.626Z",
+  "cases": [
+    {
+      "args": [
+        "search",
+        "lofi"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "result",
+          "value": [
+            {
+              "key": "albums",
+              "value": [
+                [
+                  {
+                    "key": "albumType",
+                    "value": "string"
+                  },
+                  {
+                    "key": "artist",
+                    "value": "string"
+                  },
+                  {
+                    "key": "cover",
+                    "value": "string"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "year",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "artists",
+              "value": [
+                [
+                  {
+                    "key": "artist",
+                    "value": "string"
+                  },
+                  {
+                    "key": "cover",
+                    "value": "string"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "playlists",
+              "value": [
+                [
+                  {
+                    "key": "artist",
+                    "value": "string"
+                  },
+                  {
+                    "key": "cover",
+                    "value": "string"
+                  },
+                  {
+                    "key": "id",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "query",
+              "value": "string"
+            },
+            {
+              "key": "songs",
+              "value": [
+                [
+                  {
+                    "key": "album",
+                    "value": "string"
+                  },
+                  {
+                    "key": "albumId",
+                    "value": "string"
+                  },
+                  {
+                    "key": "artist",
+                    "value": "string"
+                  },
+                  {
+                    "key": "artistId",
+                    "value": "string"
+                  },
+                  {
+                    "key": "duration",
+                    "value": "string"
+                  },
+                  {
+                    "key": "thumbnail",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  },
+                  {
+                    "key": "videoId",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "totalSongs",
+              "value": "number"
+            }
+          ]
+        },
+        {
+          "key": "status",
+          "value": "boolean"
+        }
+      ]
+    },
+    {
+      "args": [
+        "suggest",
+        "lofi"
+      ],
+      "exit": 0,
+      "shape": [
+        "string"
+      ]
+    }
+  ]
 }

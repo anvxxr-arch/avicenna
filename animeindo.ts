@@ -7,6 +7,7 @@
 
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
+import type { AnyNode } from 'domhandler';
 
 declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
 
@@ -47,7 +48,8 @@ function getHeaders(): Record<string, string> {
 async function fetchHTML(rawUrl: string): Promise<string> {
   // origin-pinned (site host only); also trims the UTF-8 BOM some pages prepend
   const url = site.sanitizeUrl(rawUrl);
-  const res = await site.request(url, { headers: getHeaders() });
+  // the site redirects legacy /search.php?q= to /?s= — same host, so allowed
+  const res = await site.request(url, { headers: getHeaders(), follow: true });
   jar.update(res);
   if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${url}`);
   return (await res.text()).replace(/^\uFEFF/, '');
@@ -114,7 +116,7 @@ function parsePagination($: CheerioAPI): Rec {
   return result;
 }
 
-function parseCardHome($: CheerioAPI, element: unknown): Rec | null {
+function parseCardHome($: CheerioAPI, element: AnyNode): Rec | null {
   const $el = $(element);
   let link: string | null = null;
   let title: string | null = null;
@@ -148,7 +150,7 @@ function parseCardHome($: CheerioAPI, element: unknown): Rec | null {
   return null;
 }
 
-function parseCardTable($: CheerioAPI, element: unknown): Rec | null {
+function parseCardTable($: CheerioAPI, element: AnyNode): Rec | null {
   const $el = $(element);
   const $thumb = $el.find('.vithumb img');
   const $title = $el.find('.videsc a:first');
@@ -158,7 +160,7 @@ function parseCardTable($: CheerioAPI, element: unknown): Rec | null {
   const title = $title.text().trim();
   const url = $title.attr('href') || '';
   const labels: string[] = [];
-  $labels.each((_, label) => labels.push($(label).text().trim()));
+  $labels.each((_, label) => { labels.push($(label).text().trim()); });
   const description = $desc.text().trim();
   if (!title || !url) return null;
   return {

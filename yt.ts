@@ -70,6 +70,18 @@ function thumbnail(thumbnails: Array<{ url: string; width?: number }> | undefine
   const sorted = [...thumbnails].sort((a, b) => (b.width || 0) - (a.width || 0));
   return sorted[0].url;
 }
+/** Safe property read on untrusted JSON: `undefined` when the parent is not an object. */
+function get<T>(o: unknown, k: string): T | undefined {
+  return o && typeof o === 'object' ? (o as Record<string, unknown>)[k] as T : undefined;
+}
+/** `{ runs: [{ text }] }` (or a missing field) → the runs array, else undefined. */
+function runsOf(x: unknown): Array<{ text: string }> | undefined {
+  return get<Array<{ text: string }>>(x, 'runs');
+}
+/** `{ thumbnails: [{ url, width }] }` (or a missing field) → the thumbnails array, else undefined. */
+function thumbsOf(x: unknown): Array<{ url: string; width?: number }> | undefined {
+  return get<Array<{ url: string; width?: number }>>(x, 'thumbnails');
+}
 
 function findAll(obj: unknown, key: string, out: unknown[] = []): unknown[] {
   if (!obj || typeof obj !== 'object') return out;

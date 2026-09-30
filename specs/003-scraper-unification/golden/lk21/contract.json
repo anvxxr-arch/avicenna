@@ -1,0 +1,157 @@
+{
+  "scraper": "lk21",
+  "capturedAt": "2026-09-30T01:14:22.640Z",
+  "cases": [
+    {
+      "args": [
+        "detail",
+        "uprising-2026"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "countries",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "details",
+          "value": [
+            {
+              "key": "Bintang Film:",
+              "value": "string"
+            },
+            {
+              "key": "Negara:",
+              "value": "string"
+            },
+            {
+              "key": "Release:",
+              "value": "string"
+            },
+            {
+              "key": "Subtitle:",
+              "value": "string"
+            },
+            {
+              "key": "Sutradara:",
+              "value": "string"
+            },
+            {
+              "key": "Updated:",
+              "value": "string"
+            },
+            {
+              "key": "Votes:",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "downloadUrl",
+          "value": "string"
+        },
+        {
+          "key": "genres",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "id",
+          "value": "string"
+        },
+        {
+          "key": "info",
+          "value": [
+            "string"
+          ]
+        },
+        {
+          "key": "player",
+          "value": "string"
+        },
+        {
+          "key": "players",
+          "value": [
+            [
+              {
+                "key": "server",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "poster",
+          "value": "string"
+        },
+        {
+          "key": "rating",
+          "value": "string"
+        },
+        {
+          "key": "runtime",
+          "value": "string"
+        },
+        {
+          "key": "site",
+          "value": "string"
+        },
+        {
+          "key": "slug",
+          "value": "string"
+        },
+        {
+          "key": "synopsis",
+          "value": "string"
+        },
+        {
+          "key": "tags",
+          "value": [
+            [
+              {
+                "key": "name",
+                "value": "string"
+              },
+              {
+                "key": "url",
+                "value": "string"
+              }
+            ]
+          ]
+        },
+        {
+          "key": "title",
+          "value": "string"
+        },
+        {
+          "key": "trailerUrl",
+          "value": "string"
+        },
+        {
+          "key": "type",
+          "value": "string"
+        },
+        {
+          "key": "year",
+          "value": "number"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "no-such-film-xyz-404"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "unknown slug must surface an explicit error"
+    }
+  ]
+}
