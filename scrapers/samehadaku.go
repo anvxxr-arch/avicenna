@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -49,17 +50,13 @@ var shSite = NewSite(SiteConfig{
 })
 
 func init() {
+	// A Cloudflare-session cookie is what makes this source usable from a plain
+	// HTTP client; the cookie belongs to whatever host SAMEHADAKU_BASE points at.
 	if c := os.Getenv("SAMEHADAKU_COOKIE"); c != "" {
-		shSite.SetCookie(shHostOf(shBase), c)
+		if u, err := url.Parse(shBase); err == nil {
+			shSite.SetCookie(u.Host, c)
+		}
 	}
-}
-
-func shHostOf(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "v2.samehadaku.how"
-	}
-	return u.Host
 }
 
 // shFetch GETs an origin-pinned page and trims the UTF-8 BOM.
@@ -105,7 +102,12 @@ func shAbs(href string) string {
 }
 
 // shPageTitle strips the trailing site suffix from <title>.
-var shTitleSuffixRe = regexp.MustCompile(`(?i)\s*[–|-]\s*Samehadaku\s*$`)
+var (
+	shTitleSuffixRe = regexp.MustCompile(`(?i)\s*[–|-]\s*Samehadaku\s*$`)
+	shReleasedRe    = regexp.MustCompile(`(?is).*Released on:\s*`)
+	shViewsRe       = regexp.MustCompile(`(?is)\s*Views.*`)
+	shPageOfRe      = regexp.MustCompile(`(?i)of\s+(\d+)`)
+)
 
 func shPageTitle(doc *goquery.Document) string {
 	return Txt(shTitleSuffixRe.ReplaceAllString(doc.Find("title").First().Text(), ""), 200)
@@ -121,7 +123,7 @@ func shPostShowCard(sel *goquery.Selection) map[string]any {
 	abs := shAbs(href)
 	out := map[string]any{
 		"title": Txt(a.Text(), 200),
-		"slug":  strings.TrimSuffix(strings.Replace(abs, shBase+"/anime/", "", 1), "/"),
+		"slug":  shSlug(abs),
 		"url":   abs,
 	}
 	if poster, ok := sel.Find("img").First().Attr("src"); ok && poster != "" {
@@ -141,7 +143,7 @@ func shPostShowCard(sel *goquery.Selection) map[string]any {
 		if !strings.Contains(strings.ToLower(t), "released on") {
 			return true
 		}
-		released = Txt(regexp.MustCompile(`(?is).*Released on:\s*`).ReplaceAllString(t, ""), 60)
+		released = Txt(shReleasedRe.ReplaceAllString(t, ""), 60)
 		return false
 	})
 	if released != "" {
@@ -164,7 +166,7 @@ func shAnimpostCard(sel *goquery.Selection) map[string]any {
 	}
 	out := map[string]any{
 		"title":  Txt(title, 200),
-		"slug":   strings.TrimSuffix(strings.Replace(abs, shBase+"/anime/", "", 1), "/"),
+		"slug":   shSlug(abs),
 		"url":    abs,
 		"poster": nilOrStr(sel.Find("img.anmsa").First().AttrOr("src", "")),
 		"type":   nilOrStr(Txt(sel.Find(".content-thumb .type").First().Text(), 30)),
@@ -177,7 +179,7 @@ func shAnimpostCard(sel *goquery.Selection) map[string]any {
 		if !strings.Contains(strings.ToLower(t), "views") {
 			return true
 		}
-		views = Txt(regexp.MustCompile(`(?is)\s*Views.*`).ReplaceAllString(t, ""), 20)
+		views = Txt(shViewsRe.ReplaceAllString(t, ""), 20)
 		return false
 	})
 	if views != "" {
@@ -197,31 +199,19 @@ func shAnimpostCard(sel *goquery.Selection) map[string]any {
 	return out
 }
 
-// nilOrStr maps a possibly-empty string (or a two-value Attr result) to
-// either the string or an explicit null, matching the reference's `x || null`.
-func nilOrStr(v any) any {
-	switch t := v.(type) {
-	case string:
-		if t == "" {
-			return nil
-		}
-		return t
-	case []any:
+// nilOrStr is the reference's `x || null` for string fields.
+func nilOrStr(s string) any {
+	if s == "" {
 		return nil
 	}
-	return nil
+	return s
 }
 
 // === COMMANDS ===
-// shClampPage mirrors the reference's Math.min(50, Math.max(1, page || 1)).
-func shClampPage(p int) int {
-	if p < 1 {
-		return 1
-	}
-	if p > 50 {
-		return 50
-	}
-	return p
+// shAtoi is JS parseInt for the digits-only fields this site emits.
+func shAtoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }
 
 // shSearch mirrors search().
@@ -242,13 +232,6 @@ func shSearch(query string) (map[string]any, error) {
 			results = append(results, c)
 		}
 	})
-	if len(results) == 0 {
-		doc.Find("div.post-show li").Each(func(_ int, el *goquery.Selection) {
-			if c := shPostShowCard(el); c != nil {
-				results = append(results, c)
-			}
-		})
-	}
 	return map[string]any{"query": q, "url": pageURL, "count": len(results), "results": results}, nil
 }
 
@@ -263,7 +246,7 @@ func shDoc(rawURL string) (*goquery.Document, error) {
 
 // shHome mirrors home().
 func shHome(page int) (map[string]any, error) {
-	p := shClampPage(page)
+	p := min(50, max(1, page))
 	pageURL := shBase + "/"
 	if p != 1 {
 		pageURL = fmt.Sprintf("%s/page/%d/", shBase, p)
@@ -303,7 +286,7 @@ func shHome(page int) (map[string]any, error) {
 
 // shList mirrors list().
 func shList(page int) (map[string]any, error) {
-	p := shClampPage(page)
+	p := min(50, max(1, page))
 	pageURL := shBase + "/anime-terbaru/"
 	if p != 1 {
 		pageURL = fmt.Sprintf("%s/anime-terbaru/page/%d/", shBase, p)
@@ -319,8 +302,8 @@ func shList(page int) (map[string]any, error) {
 		}
 	})
 	var total any
-	if m := regexp.MustCompile(`(?i)of\s+(\d+)`).FindStringSubmatch(Txt(doc.Find(".pagination span").First().Text(), 40)); m != nil {
-		total = atoiSafe(m[1])
+	if m := shPageOfRe.FindStringSubmatch(Txt(doc.Find(".pagination span").First().Text(), 40)); m != nil {
+		total = shAtoi(m[1])
 	}
 	return map[string]any{
 		"creator": "avicenna", "url": pageURL, "page": p,
@@ -405,7 +388,7 @@ func shPlayerOptions(doc *goquery.Document, includeType bool) []any {
 	options := []any{}
 	doc.Find("#server .east_player_option, .east_player_option").Each(func(_ int, el *goquery.Selection) {
 		o := map[string]any{
-			"nume": atoiSafe(el.AttrOr("data-nume", "0")),
+			"nume": shAtoi(el.AttrOr("data-nume", "0")),
 			"name": Txt(el.Find("span").First().Text(), 60),
 			"post": nilOrStr(el.AttrOr("data-post", "")),
 		}
@@ -564,18 +547,6 @@ func shBatch(rawSlug string) (map[string]any, error) {
 
 var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)
 
-// shAtoi is JS parseInt for the small numeric fields this site emits.
-func atoiSafe(s string) int {
-	n := 0
-	for i := range s {
-		if s[i] < '0' || s[i] > '9' {
-			break
-		}
-		n = n*10 + int(s[i]-'0')
-	}
-	return n
-}
-
 // samehadakuScraper builds the CLI surface (identical to the TS reference).
 func samehadakuScraper() Scraper {
 	return Scraper{
@@ -585,7 +556,7 @@ func samehadakuScraper() Scraper {
 			"home": {
 				Name: "home", Desc: "Latest anime cards + latest-episode feed", Usage: "[page]",
 				Run: func(args []string, _ map[string]string) (any, error) {
-					return shHome(atoiSafe(argAt(args, 0)))
+					return shHome(shAtoi(argAt(args, 0)))
 				},
 			},
 			"search": {
@@ -597,7 +568,7 @@ func samehadakuScraper() Scraper {
 			"list": {
 				Name: "list", Desc: "Paginated anime catalogue (/anime-terbaru/)", Usage: "[page]",
 				Run: func(args []string, _ map[string]string) (any, error) {
-					return shList(atoiSafe(argAt(args, 0)))
+					return shList(shAtoi(argAt(args, 0)))
 				},
 			},
 			"detail": {
@@ -621,7 +592,7 @@ func samehadakuScraper() Scraper {
 			"mirrors": {
 				Name: "mirrors", Desc: "Resolve player mirrors via the player_ajax endpoint", Usage: "<slug|url> [nume]",
 				Run: func(args []string, _ map[string]string) (any, error) {
-					n := atoiSafe(argAt(args, 1))
+					n := shAtoi(argAt(args, 1))
 					if n == 0 {
 						n = 1
 					}

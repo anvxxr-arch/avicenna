@@ -49,6 +49,9 @@ const abs = (href: string | null | undefined): string | null =>
 function pageTitle($: CheerioAPI): string {
   return txt(($('title').first().text() || '').replace(/\s*[–|-]\s*Samehadaku\s*$/i, ''), 200);
 }
+const RELEASED_ON_RE = /.*Released on:\s*/i;
+const VIEWS_RE = /\s*Views.*/i;
+const PAGE_OF_RE = /of\s+(\d+)/i;
 
 /** One `div.post-show li` card (home / anime-terbaru / search fallback). */
 function parsePostShowCard($: CheerioAPI, el: unknown): Rec | null {
@@ -65,12 +68,12 @@ function parsePostShowCard($: CheerioAPI, el: unknown): Rec | null {
       .filter((_, s) => /Released on/i.test($(s).text()))
       .first()
       .text()
-      .replace(/.*Released on:\s*/i, ''),
+      .replace(RELEASED_ON_RE, ''),
     60,
   );
   return {
     title,
-    slug: url.replace(BASE + '/anime/', '').replace(/\/$/, ''),
+    slug: slugOf(url),
     url,
     poster: $el.find('img').first().attr('src') || null,
     ...(episode ? { episode } : {}),
@@ -92,13 +95,13 @@ function parseAnimpostCard($: CheerioAPI, el: unknown): Rec | null {
     .filter(Boolean);
   return {
     title: txt(a.attr('title') || a.text(), 200),
-    slug: url.replace(BASE + '/anime/', '').replace(/\/$/, ''),
+    slug: slugOf(url),
     url,
     poster: $el.find('img.anmsa').first().attr('src') || null,
     type: txt($el.find('.content-thumb .type').first().text(), 30) || null,
     score: txt($el.find('.content-thumb .score').first().text().replace(/[^\d.]/g, ''), 12) || null,
     status: txt($el.find('.data .type').first().text(), 30) || null,
-    views: txt(($el.find('.metadata span').filter((_, s) => /Views/i.test($(s).text())).first().text() || '').replace(/\s*Views.*/i, ''), 20) || null,
+    views: txt(($el.find('.metadata span').filter((_, s) => /Views/i.test($(s).text())).first().text() || '').replace(VIEWS_RE, ''), 20) || null,
     ...(genres.length ? { genres } : {}),
   };
 }
@@ -114,13 +117,6 @@ async function search(query: string): Promise<Rec> {
     const c = parseAnimpostCard($, el);
     if (c) results.push(c);
   });
-  if (!results.length) {
-    // some queries render the plain card list instead
-    $('div.post-show li').each((_, el) => {
-      const c = parsePostShowCard($, el);
-      if (c) results.push(c);
-    });
-  }
   return { query: q, url, count: results.length, results };
 }
 
@@ -159,7 +155,7 @@ async function list(page = 1): Promise<Rec> {
     if (c) items.push(c);
   });
   const pageInfo = txt($('.pagination span').first().text(), 40);
-  const [, totalPage] = /of\s+(\d+)/i.exec(pageInfo) || [];
+  const [, totalPage] = PAGE_OF_RE.exec(pageInfo) || [];
   return {
     creator: CREATOR,
     url,
