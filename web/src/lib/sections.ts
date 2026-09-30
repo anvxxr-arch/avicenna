@@ -33,7 +33,7 @@ export const SECTIONS: SectionDef[] = [
   },
   {
     path: '/samehadaku', label: 'Samehadaku', blurb: 'Anime catalogue, search, episode mirrors and batch downloads.',
-    endpoints: ['/samehadaku/home', '/samehadaku/search', '/samehadaku/list', '/samehadaku/detail', '/samehadaku/episode', '/samehadaku/batch', '/samehadaku/schedule'],
+    endpoints: ['/samehadaku/home', '/samehadaku/search', '/samehadaku/apksearch', '/samehadaku/detail', '/samehadaku/episode', '/samehadaku/apk', '/samehadaku/batch', '/samehadaku/schedule'],
     runtime: 'go', status: 'live', source: 'v2.samehadaku.how',
   },
   {

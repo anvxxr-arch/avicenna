@@ -14,6 +14,8 @@ pins the parsers against these instead.
 | `episode.html` | `/one-piece-episode-1180/` | `.server_option`, `#downloadb` |
 | `episode-head.html` | same | `h1.entry-title`, `.naveps` |
 | `batch.html` | `/batch/one-piece-batch/` | `#downloadb` |
+| `apk-search.json` | `/wp-json/apk/search?s=one piece` | raw JSON (mobile API) |
+| `apk-episode.json` | `/wp-json/apk/episode?id=54232` | raw JSON (mobile API) |
 
 Refresh by re-capturing with a real browser session (the selectors above), then
 re-run `go test ./scrapers/ -run Samehadaku`.

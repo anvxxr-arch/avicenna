@@ -7,6 +7,8 @@
 package scrapers
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -210,5 +212,51 @@ func TestSamehadakuSlugGuard(t *testing.T) {
 		if got := shSlug(in); got != want {
 			t.Errorf("shSlug(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// The mobile API (`/wp-json/apk/*`) is JSON, so these fixtures are the raw
+// responses — the pair search→episode is what turns a title into mirror embeds.
+func TestSamehadakuApkFixtures(t *testing.T) {
+	search, err := os.ReadFile(shFixtureDir + "/apk-search.json")
+	if err != nil {
+		t.Fatalf("apk search fixture: %v", err)
+	}
+	var results []map[string]any
+	if err := json.Unmarshal(search, &results); err != nil {
+		t.Fatalf("apk search fixture is not a JSON array: %v", err)
+	}
+	if len(results) != 8 {
+		t.Fatalf("results = %d, want 8", len(results))
+	}
+	first := results[0]
+	if first["title"] != "One Piece: Heroines" {
+		t.Errorf("title = %v", first["title"])
+	}
+	// the id embedded in `url` is the handle for the episode call
+	if id := shSlug(fmt.Sprint(first["url"])); id == "" || shDigitsOnly(fmt.Sprint(first["url"])) == "" {
+		t.Errorf("url must carry the numeric id, got %v", first["url"])
+	}
+
+	ep, err := os.ReadFile(shFixtureDir + "/apk-episode.json")
+	if err != nil {
+		t.Fatalf("apk episode fixture: %v", err)
+	}
+	var rec map[string]any
+	if err := json.Unmarshal(ep, &rec); err != nil {
+		t.Fatalf("apk episode fixture is not a JSON object: %v", err)
+	}
+	if rec["episode"] != "1180" || rec["title"] != "One Piece Episode 1180" {
+		t.Errorf("episode/title = %v / %v", rec["episode"], rec["title"])
+	}
+	players, ok := rec["player"].([]any)
+	if !ok || len(players) == 0 {
+		t.Fatalf("player = %v", rec["player"])
+	}
+	if name := players[0].(map[string]any)["title"]; name != "Blogspot " {
+		t.Errorf("first player = %v", name)
+	}
+	if prev, _ := rec["prev"].(string); !strings.Contains(prev, "id=52740") {
+		t.Errorf("prev = %q", prev)
 	}
 }

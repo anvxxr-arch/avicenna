@@ -223,7 +223,7 @@ func shSearch(query string) (map[string]any, error) {
 		return nil, errors.New("Query too short")
 	}
 	// encodeURIComponent semantics: spaces become %20, not "+".
-	pageURL := shBase + "/?s=" + strings.ReplaceAll(url.QueryEscape(q), "+", "%20")
+	pageURL := shBase + "/?s=" + shEncode(q)
 	doc, err := shDoc(pageURL)
 	if err != nil {
 		return nil, err
@@ -549,6 +549,69 @@ func shBatch(rawSlug string) (map[string]any, error) {
 
 var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)
 
+// The site's own mobile-client API (`/wp-json/apk/*`): search returns the numeric
+// post ids that `/apk/episode?id=` consumes, so the pair is the cheapest path
+// from a title to a mirror list — no HTML, no nonce, no player_ajax.
+func shApkSearch(query string) (map[string]any, error) {
+	q := Txt(query, 100)
+	if n16(q) < 2 {
+		return nil, errors.New("Query too short")
+	}
+	raw, err := shSite.Fetch("/wp-json/apk/search?s=" + shEncode(q))
+	if err != nil {
+		return nil, err
+	}
+	var results []any
+	out := map[string]any{"query": q}
+	if json.Unmarshal([]byte(raw), &results) == nil {
+		out["count"] = len(results)
+		out["results"] = results
+		return out, nil
+	}
+	var fault struct {
+		Error string `json:"error"`
+	}
+	_ = json.Unmarshal([]byte(raw), &fault)
+	out["count"] = 0
+	out["results"] = []any{}
+	if fault.Error != "" {
+		out["note"] = fault.Error
+	}
+	return out, nil
+}
+
+// shApkEpisode returns one episode record from the mobile API.
+func shApkEpisode(id string) (map[string]any, error) {
+	clean := shDigitsOnly(id)
+	if clean == "" {
+		return nil, errors.New("Numeric post id required")
+	}
+	raw, err := shSite.Fetch("/wp-json/apk/episode?id=" + clean)
+	if err != nil {
+		return nil, err
+	}
+	var rec map[string]any
+	if err := json.Unmarshal([]byte(raw), &rec); err != nil {
+		return nil, err
+	}
+	return rec, nil
+}
+
+func shDigitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// shEncode is encodeURIComponent for query values.
+func shEncode(s string) string {
+	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
+}
+
 var shScheduleDays = []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 
 // shSchedule mirrors schedule(): the weekly schedule comes from the site's own
@@ -609,6 +672,18 @@ func samehadakuScraper() Scraper {
 				Name: "batch", Desc: "Batch download groups", Usage: "<slug|url>",
 				Run: func(args []string, _ map[string]string) (any, error) {
 					return shBatch(argAt(args, 0))
+				},
+			},
+			"apksearch": {
+				Name: "apksearch", Desc: "Search the site's mobile API (returns numeric post ids)", Usage: "<query>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shApkSearch(strings.Join(args, " "))
+				},
+			},
+			"apk": {
+				Name: "apk", Desc: "Episode record from the mobile API: players, prev, thumb", Usage: "<numeric id>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shApkEpisode(argAt(args, 0))
 				},
 			},
 			"schedule": {

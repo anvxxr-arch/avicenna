@@ -54,6 +54,8 @@ const config: Record<string, SectionConfig> = {
       { name: 'episode', path: '/samehadaku/episode', params: { args: 'one-piece-episode-1180' } },
       { name: 'batch', path: '/samehadaku/batch', params: { args: 'one-piece-batch' } },
       { name: 'schedule', path: '/samehadaku/schedule', params: { args: 'sunday' }, input: { key: 'args', placeholder: 'monday…sunday' } },
+      { name: 'api search', path: '/samehadaku/apksearch', params: { args: 'one piece' }, input: { key: 'args', placeholder: 'title → numeric ids…' } },
+      { name: 'api episode', path: '/samehadaku/apk', params: { args: '54232' } },
     ],
   },
   '/film': {

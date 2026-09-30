@@ -364,6 +364,26 @@ async function batch(rawSlug: string): Promise<Rec> {
   };
 }
 
+/**
+ * The site's own mobile-client API (`/wp-json/apk/*`). Its search returns the
+ * numeric post ids that `/apk/episode?id=` consumes, so the pair is the cheapest
+ * path from a title to a mirror list — no HTML, no nonce, no player_ajax.
+ */
+async function apkSearch(query: string): Promise<Rec> {
+  const q = txt(query, 100);
+  if (q.length < 2) throw new Error('Query too short');
+  const parsed = JSON.parse(await fetchPage(`/wp-json/apk/search?s=${encodeURIComponent(q)}`)) as Rec[] | { error?: string };
+  const results = Array.isArray(parsed) ? parsed : [];
+  return { query: q, count: results.length, results, ...(Array.isArray(parsed) ? {} : { note: String(parsed.error ?? '') }) };
+}
+
+/** `apk <id>`: one episode record from the mobile API (players, prev, thumb). */
+async function apkEpisode(id: string): Promise<Rec> {
+  const clean = String(id || '').replace(/[^0-9]/g, '');
+  if (!clean) throw new Error('Numeric post id required');
+  return JSON.parse(await fetchPage(`/wp-json/apk/episode?id=${clean}`)) as Rec;
+}
+
 const SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
 /** `schedule <day>`: the weekly release schedule, from the site's own REST endpoint. */
@@ -413,6 +433,14 @@ if (import.meta.main) {
       schedule: {
         desc: 'Weekly release schedule for one day', usage: '<monday..sunday>',
         run: (p) => schedule(p[0] || ''),
+      },
+      apksearch: {
+        desc: 'Search the site\'s mobile API (returns numeric post ids)', usage: '<query>',
+        run: (p) => apkSearch(p.join(' ')),
+      },
+      apk: {
+        desc: 'Episode record from the mobile API: players, prev, thumb', usage: '<numeric id>',
+        run: (p) => apkEpisode(p[0] || ''),
       },
     },
     examples: `  bun samehadaku.ts home
