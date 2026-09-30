@@ -24,4 +24,5 @@ specs/*/parity-report.json
 # --- build output ---
 nontonanime-rs/target/
 dist/
+web/dist/
 .turbo/
