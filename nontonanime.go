@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"nontonanime/scrapers"
 	"os"
 	"regexp"
 	"sort"
@@ -2037,6 +2038,58 @@ func emit(v interface{}) {
 // from nontonanime.go alone). nil when the API file is not part of the build.
 var apiCommandHook func(cmd string, args []string) bool
 
+// findScraper resolves a CLI name to a ported scraper (scrapers package).
+func findScraper(name string) (scrapers.Scraper, bool) {
+	for _, s := range scrapers.All() {
+		if s.Name == name {
+			return s, true
+		}
+	}
+	return scrapers.Scraper{}, false
+}
+
+func printScraperUsage(s scrapers.Scraper) {
+	fmt.Println(s.Title)
+	fmt.Println(strings.Repeat("=", maxInt(len(s.Title), 20)))
+	fmt.Println("Commands:")
+	names := make([]string, 0, len(s.Commands))
+	for n := range s.Commands {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		c := s.Commands[n]
+		fmt.Printf("  %s %s %-24s %s\n", s.Name, n, c.Usage, c.Desc)
+	}
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// splitArgs parses trailing args after `scraper command`, mirroring the TS CLI
+// flag grammar (--flag, --flag=value; bare switches become "true").
+func splitArgs(args []string) ([]string, map[string]string) {
+	pos := []string{}
+	flags := map[string]string{}
+	for _, a := range args {
+		if strings.HasPrefix(a, "--") {
+			body := a[2:]
+			if i := strings.Index(body, "="); i == -1 {
+				flags[body] = "true"
+			} else {
+				flags[body[:i]] = body[i+1:]
+			}
+		} else {
+			pos = append(pos, a)
+		}
+	}
+	return pos, flags
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	args := os.Args[1:]
@@ -2182,6 +2235,29 @@ func main() {
 		}
 		result, err = loadMoreHome(ids, atoi(flags["offset"]))
 	default:
+		// Fall through to the scraper registry (one CLI per ported site, same
+		// surface as their TS CLIs: `avicenna <scraper> <command> [args…]`).
+		if sc, ok := findScraper(cmd); ok {
+			name := get(1)
+			if name == "" || name == "help" {
+				printScraperUsage(sc)
+				return
+			}
+			c, ok := sc.Commands[name]
+			if !ok {
+				fmt.Fprintf(os.Stderr, "Unknown command for %s: %s\n", sc.Name, name)
+				printScraperUsage(sc)
+				os.Exit(1)
+			}
+			scPos, scFlags := splitArgs(pos[2:])
+			result, err = c.Run(scPos, scFlags)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[ERROR] %s\n", err.Error())
+				os.Exit(1)
+			}
+			emit(result)
+			return
+		}
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		printUsage()
 		return
