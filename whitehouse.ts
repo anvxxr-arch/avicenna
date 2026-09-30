@@ -26,12 +26,12 @@ const { fetchPage } = site;
 const SECTIONS: Record<string, string> = {
   news: '/news/',
   releases: '/releases/',
-  briefings: '/briefings/',
+  briefings: '/briefings-statements/',
   'presidential-actions': '/presidential-actions/',
-  'executive-orders': '/executive-orders/',
-  memoranda: '/memoranda/',
-  proclamations: '/proclamations/',
-  nominations: '/nominations/',
+  'executive-orders': '/presidential-actions/executive-orders/',
+  memoranda: '/presidential-actions/presidential-memoranda/',
+  proclamations: '/presidential-actions/proclamations/',
+  nominations: '/presidential-actions/nominations-appointments/',
   'fact-sheets': '/fact-sheets/',
   remarks: '/remarks/',
   research: '/research/',
@@ -57,41 +57,31 @@ function topperTitle($: CheerioAPI): string {
   return $('h1.wp-block-whitehouse-topper__headline').first().text().trim();
 }
 
+/** Legacy pagination contract: `{ current, total, pages:[{number,url,current}], next }`. */
 function parsePagination($: CheerioAPI, baseUrl: string) {
-  const pages: number[] = [];
+  const pages: Array<{ number: number; url: string | null; current: boolean }> = [];
   let total = 0;
-  let next: string | null = null;
-  $('nav.wp-block-query-pagination .page-numbers:not(.dots)').each((_, el) => {
+  $('nav.wp-block-query-pagination .page-numbers').each((_, el) => {
     const $n = $(el);
-    const txtv = $n.text().trim();
-    const hrefv = $n.attr('href');
-    if (txtv.match(/^\d+$/)) pages.push(parseInt(txtv, 10));
-    if (txtv.toLowerCase() === 'next' && hrefv) next = abs(hrefv, baseUrl);
-    total++;
+    const n = parseInt($n.text().trim(), 10);
+    if (!Number.isNaN(n)) {
+      total = Math.max(total, n);
+      pages.push({ number: n, url: $n.is('a') ? abs($n.attr('href'), baseUrl) : null, current: $n.hasClass('current') });
+    }
   });
-  const currentTxt = $('nav.wp-block-query-pagination .page-numbers.current').first().text().trim();
-  return {
-    currentPage: parseInt(currentTxt, 10) || 1,
-    pages,
-    next,
-    hasMore: !!next,
-  };
+  const next = $('nav.wp-block-query-pagination a.wp-block-query-pagination-next').attr('href') || null;
+  return { current: (pages.find((p) => p.current) || {}).number || 1, total, pages, next: next ? abs(next, baseUrl) : null };
 }
-
+/** Legacy filters: topper-navigation links -> `{label,url,active}`. */
 function parseFilters($: CheerioAPI, baseUrl: string) {
-  const filters: Array<{ label: string; value: string }> = [];
-  $('select[name], .wp-block-whitehouse-filter select').each((_, el) => {
-    const name = $(el).attr('name');
-    if (!name) return;
-    const options: Array<{ value: string; label: string }> = [];
-    $(el).find('option').each((_, o) => {
-      options.push({ value: $(o).attr('value') || '', label: $(o).text().trim() });
-    });
-    filters.push({ label: name, value: JSON.stringify(options).slice(0, 500) });
+  const filters: Array<{ label: string; url: string | null; active: boolean }> = [];
+  $('.wp-block-whitehouse-topper-navigation__parent-item, .wp-block-whitehouse-topper-navigation__child-item').each((_, el) => {
+    const $a = $(el).find('a').first();
+    if (!$a.length) return;
+    filters.push({ label: $a.text().trim(), url: abs($a.attr('href'), baseUrl), active: $a.hasClass('is-current') });
   });
   return filters;
 }
-
 interface Post {
   title: string;
   url: string | null;

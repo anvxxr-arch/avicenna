@@ -26,25 +26,36 @@ function shape(v: Json): string {
   return typeof v;
 }
 
+/** A golden file counts only when it parses to a non-empty JSON value. */
+function readGolden(path: string): Json {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (e) {
+    console.error(`golden unreadable: ${path} — ${(e as Error).message}`);
+    process.exit(2);
+  }
+  if (!raw || raw.trim() === '') {
+    console.error(`golden empty: ${path}`);
+    process.exit(2);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error(`golden is not valid JSON: ${path} — ${(e as Error).message}`);
+    process.exit(2);
+  }
+}
 function main(): void {
   const [, , a, b] = process.argv;
   if (!a || !b) { console.error('usage: golden-diff <golden.json> <new.json>'); process.exit(2); }
-  // read golden but tolerate non-JSON or empty (e.g. stderr files or missing golden)
-  let ga: Json;
-  try {
-    const raw = readFileSync(a, 'utf8');
-    if (!raw || raw.trim() === '') ga = null as never;
-    else ga = JSON.parse(raw);
-  } catch (_) { ga = null as never; }
-  // read new file
+  const ga: Json = readGolden(a);
   let gb: Json;
   try {
     const raw = readFileSync(b, 'utf8');
-    if (!raw || raw.trim() === '') { console.log('OK  new file empty'); process.exit(0); }
+    if (!raw || raw.trim() === '') { console.error(`new output empty: ${b}`); process.exit(1); }
     gb = JSON.parse(raw);
   } catch (e) { console.error(`parse fail ${b}: ${(e as Error).message}`); process.exit(2); }
-  // If golden missing or empty, treat shape OK
-  if (ga === null) { console.log('OK  golden missing/empty'); process.exit(0); }
   const sa = shape(ga), sb = shape(gb);
   if (sa === sb) { console.log('OK  shapes match'); process.exit(0); }
   console.error('MISMATCH');

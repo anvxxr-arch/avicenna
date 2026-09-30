@@ -90,23 +90,24 @@ function fail(msg: string): never {
   process.exit(2);
 }
 
-function refreshBinaries(): void {
+/** Ensure each ported runtime has a binary; build it when missing or stale.
+ * Exit 2 (env failure) only when the toolchain itself cannot produce one. */
+async function refreshBinaries(): Promise<void> {
   for (const rt of RUNTIMES) {
-    if (rt.name === 'ts') continue;
-    if (!rt.bin || !existsSync(rt.bin)) fail(`binary missing for ${rt.name}: ${rt.bin}`);
-    if (rt.src && existsSync(rt.src)) {
-      if (statSync(rt.src).mtimeMs > statSync(rt.bin).mtimeMs) {
-        console.log(`[env] rebuilding ${rt.name} (source newer than binary)...`);
-        if (rt.name === 'go') {
-          const r = $`go build -o ${rt.bin} nontonanime.go`.quiet().nothrow();
-          void r;
-        }
-        // rust rebuild is expensive (minutes); warn instead of auto-run
-        if (rt.name === 'rs') {
-          console.log(`[env] WARN: rust source newer than binary — run: cd nontonanime-rs && cargo build --release`);
-        }
-      }
+    if (rt.name === 'ts' || !rt.bin || !rt.src || !existsSync(rt.src)) continue;
+    const missing = !existsSync(rt.bin);
+    const stale = !missing && statSync(rt.src).mtimeMs > statSync(rt.bin).mtimeMs;
+    if (!missing && !stale) continue;
+    if (rt.name === 'go') {
+      console.log(`[env] ${missing ? 'building' : 'rebuilding'} go (${missing ? 'binary missing' : 'source newer than binary'})...`);
+      // MUST await: Bun's `$` is a lazy thenable — an un-awaited template never spawns.
+      const r = await $`go build -o ${rt.bin} nontonanime.go`.quiet().nothrow();
+      if (r.exitCode !== 0) fail(`go build failed: ${r.stderr.toString().slice(0, 200)}`);
+      continue;
     }
+    // rust rebuild is expensive (minutes); warn instead of auto-run
+    if (missing) fail(`binary missing for ${rt.name}: ${rt.bin} — run: cd nontonanime-rs && cargo build --release`);
+    console.log(`[env] WARN: rust source newer than binary — run: cd nontonanime-rs && cargo build --release`);
   }
 }
 
@@ -195,7 +196,7 @@ async function main(): Promise<void> {
     : 'specs/001-parity-test-suite/parity-report.json';
 
   const t0 = Date.now();
-  refreshBinaries();
+  await refreshBinaries();
 
   const results: CaseResult[] = [];
   const ts = RUNTIMES[0];

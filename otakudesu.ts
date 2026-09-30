@@ -425,6 +425,11 @@ async function episode(slug: string): Promise<Rec> {
   if (otherEpisodes.length) data.otherEpisodes = otherEpisodes;
   return buildResponse('episode', url, data);
 }
+/** Legacy `watch`: same payload as episode, labelled `watch`. */
+async function watch(slug: string): Promise<Rec> {
+  const out = (await episode(slug)).data as Rec | undefined;
+  return buildResponse('watch', `${BASE_URL}/episode/${slug}/`, (out || {}) as Rec);
+}
 
 // helper removed — episode() now fetches html once
 
@@ -451,6 +456,7 @@ if (import.meta.main) {
       detail: { desc: 'Detail anime + episode list', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Anime slug required'); return detail(p[0]); } },
       episode: { desc: 'Episode + resolved stream URLs', usage: '<episode-slug>', run: async (p) => { if (!p[0]) throw new Error('Episode slug required'); return episode(p[0]); } },
       batch: { desc: 'Batch download page', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Batch slug required'); return batch(p[0]); } },
+      watch: { desc: 'Episode streams + downloads (legacy alias of episode)', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Episode slug required'); return watch(p[0]); } },
     },
     examples: `  bun otakudesu.ts search "one piece"
   bun otakudesu.ts episode one-piece-episode-1100`,

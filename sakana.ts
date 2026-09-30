@@ -71,6 +71,18 @@ async function getModels(): Promise<string[]> {
   return data.map((a) => a.id);
 }
 
+async function getConversations(limit = 20): Promise<unknown[]> {
+  const cookie = await getCookie();
+  const res = await fetch(`${BASE}/api/conversations?limit=${limit}`, { headers: { cookie }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`conversations HTTP ${res.status}`);
+  return (await res.json()) as unknown[];
+}
+async function deleteConversation(id: string): Promise<unknown> {
+  const cookie = await getCookie();
+  const res = await fetch(`${BASE}/conversation/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { cookie, origin: BASE }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`delete HTTP ${res.status}`);
+  return await res.json().catch(() => null);
+}
 function cleanText(text: string): string {
   return text
     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -87,7 +99,8 @@ function cleanText(text: string): string {
 interface ChatResult { text: string; conversationId: string; parentMessageId: string | null }
 
 async function chat(question: string, opts: {
-  model?: string; conversationId?: string | null; needSearch?: number; thinking?: number; toneMode?: string; streamOutput?: boolean;
+  model?: string; conversationId?: string | null; parentMessageId?: string | null;
+  needSearch?: number; thinking?: number; toneMode?: string; streamOutput?: boolean;
 } = {}): Promise<ChatResult> {
   const {
     model = 'namazu',
@@ -222,10 +235,21 @@ if (import.meta.main) {
         desc: 'List available agent models',
         run: async () => ({ creator: 'rynaqrtz', info: { command: 'models', status: 'ok' }, data: { models: await getModels() } }),
       },
+      conversations: {
+        desc: 'List recent conversations', usage: '[--limit N]', flags: { limit: 'value' },
+        run: async (_p, f) => ({ creator: 'rynaqrtz', info: { command: 'conversations', status: 'ok' }, data: { conversations: await getConversations(parseInt(f.limit || '20') || 20) } }),
+      },
+      delete: {
+        desc: 'Delete a conversation by id', usage: '<id>',
+        run: async (p) => {
+          if (!p[0]) throw new Error('Missing conversation ID');
+          return { creator: 'rynaqrtz', info: { command: 'delete', status: 'ok' }, data: { deleted: await deleteConversation(p[0]) } };
+        },
+      },
     },
     examples: `  bun sakana.ts chat "halo siapa kamu"
   SAKANA_FIREBASE_KEY=<key> bun sakana.ts chat "hi"`,
   });
 }
 
-export { chat, getModels };
+export { chat, getModels, getConversations, deleteConversation };

@@ -13,6 +13,7 @@ import { createSite } from './core/fetch';
 const site = createSite({
   base: 'https://codeengo.com',
   rateMs: 500,
+  timeoutMs: 60_000,
   headers: {
     'user-agent': 'Mozilla/5.0 (Linux; Android 10; M2006C3MG)',
     'accept': 'application/json, text/plain, */*',
@@ -34,28 +35,17 @@ const STYLES: Record<string, string> = {
   butterfly: 'Macro photography of a mechanical butterfly on a flower',
 };
 
-/** Raw JSON POST — codeengo expects JSON content-type, so bypass postAjax form-encoding. */
-async function generateRaw(prompt: string): Promise<Response> {
+/** Image API POST on the site origin — core transport (SSRF pinning, limiter, caps).
+ * postAjax auto-selects JSON content-type for `{...}` bodies. */
+async function generateRaw(prompt: string): Promise<{ success?: boolean; image?: string; error?: string }> {
   const body = JSON.stringify({ prompt });
   if (body.length > 8192) throw new Error('Prompt too large');
-  const res = await fetch('https://codeengo.com/api/image.php', {
-    method: 'POST',
-    headers: {
-      'user-agent': 'Mozilla/5.0 (Linux; Android 10; M2006C3MG)',
-      'content-type': 'application/json',
-      'origin': 'https://codeengo.com',
-      'referer': 'https://codeengo.com/text-to-image.php',
-    },
-    signal: AbortSignal.timeout(60_000),
-    body,
-  });
-  if (res.status !== 200) throw new Error(`HTTP ${res.status} for image API`);
-  return res;
+  const text = await site.postAjax('/api/image.php', body, '/text-to-image.php');
+  return JSON.parse(text) as { success?: boolean; image?: string; error?: string };
 }
 
 async function generate(prompt: string): Promise<Record<string, unknown>> {
-  const res = await generateRaw(prompt);
-  const data = (await res.json()) as { success?: boolean; image?: string; error?: string };
+  const data = await generateRaw(prompt);
   if (!data.success || !data.image) {
     return { success: false, error: data.error || 'unknown error' };
   }
@@ -66,6 +56,7 @@ async function generate(prompt: string): Promise<Record<string, unknown>> {
 
   const form = new FormData();
   form.append('files[]', new Blob([buffer]), filename);
+  // uguu.se is a third-party upload service (off-origin by design) — not site traffic
   const upload = await fetch(UGUU, { method: 'POST', body: form, signal: AbortSignal.timeout(60_000) });
   const uploaded = (await upload.json()) as { files?: Array<{ url?: string }> };
   const url = uploaded?.files?.[0]?.url || null;
@@ -73,10 +64,12 @@ async function generate(prompt: string): Promise<Record<string, unknown>> {
   return { success: true, localPath: filename, url, sizeKB: Math.round(buffer.length / 1024) };
 }
 
-// void postAjax — image API is JSON+binary, postAjax (text) not applicable; site kept on createSite for config consistency
-void site;
 
 if (import.meta.main) {
+  // legacy flag entry points (`--styles`, `--test`) map onto the commands
+  const flag = process.argv[2];
+  if (flag === '--styles') process.argv[2] = 'styles';
+  else if (flag === '--test') process.argv[2] = 'test';
   defineCli({
     name: 'codeengo',
     title: 'Codeengo Text-to-Image',

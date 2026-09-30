@@ -391,6 +391,13 @@ async function batch(slug: string): Promise<Rec> {
   return buildResponse('batch', url, { title, episodes: batchData });
 }
 
+/** Legacy `supported`: capability map of implemented pages. */
+function supportedPages(): Rec {
+  return buildResponse('supportedPages', BASE_URL, {
+    home: true, genreList: true, genre: true, movies: true, jadwal: true,
+    search: true, detail: true, episode: true, watch: true, batch: true,
+  });
+}
 if (import.meta.main) {
   defineCli({
     name: 'animeindo',
@@ -405,6 +412,8 @@ if (import.meta.main) {
       detail: { desc: 'Detail anime + episode list', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Anime slug required'); return detail(p[0]); } },
       episode: { desc: 'Episode + streams + downloads', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Episode slug required'); return episode(p[0]); } },
       batch: { desc: 'Batch download page (10 eps)', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Anime slug required'); return batch(p[0]); } },
+      watch: { desc: 'Episode streams + downloads (alias of episode)', usage: '<slug>', run: async (p) => { if (!p[0]) throw new Error('Episode slug required'); return episode(p[0]); } },
+      supported: { desc: 'List supported pages/features', run: () => supportedPages() },
     },
     examples: `  bun animeindo.ts search "one piece"
   bun animeindo.ts detail one-piece
