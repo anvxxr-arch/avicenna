@@ -689,24 +689,42 @@ func safeDoc(html string) *goquery.Document {
 
 var wsRe = regexp.MustCompile(`\s+`)
 
-func txt(s string, max int) string {
-	t := strings.TrimSpace(wsRe.ReplaceAllString(s, " "))
-	// JS .slice(max) semantics: count UTF-16 code units, never split a rune
-	if len(t) > max {
-		n16 := 0
-		for i, ru := range t {
-			if n16 >= max {
-				t = t[:i]
-				break
-			}
-			if ru > 0xFFFF {
-				n16 += 2
-			} else {
-				n16++
-			}
+// n16 returns the UTF-16 code-unit length of s (JS String.length), the unit the
+// TypeScript reference clamps in. Byte slicing would split runes.
+func n16(s string) int {
+	n := 0
+	for _, ru := range s {
+		if ru > 0xFFFF {
+			n += 2
+		} else {
+			n++
 		}
 	}
-	return t
+	return n
+}
+
+// trunc16 caps s to max UTF-16 code units without splitting a rune.
+func trunc16(s string, max int) string {
+	if n16(s) <= max {
+		return s
+	}
+	n := 0
+	for i, ru := range s {
+		if n >= max {
+			return s[:i]
+		}
+		if ru > 0xFFFF {
+			n += 2
+		} else {
+			n++
+		}
+	}
+	return s
+}
+
+// JS .slice(max) semantics: count UTF-16 code units, never split a rune
+func txt(s string, max int) string {
+	return trunc16(strings.TrimSpace(wsRe.ReplaceAllString(s, " ")), max)
 }
 
 var nonNumRe = regexp.MustCompile(`[^0-9.]`)
@@ -1022,10 +1040,7 @@ func advancedSearch(opts map[string]string) ([]AnimeCard, error) {
 	params := url.Values{}
 	for _, k := range advKeys {
 		if v, ok := opts[k]; ok && v != "" {
-			if len(v) > 64 {
-				v = v[:64]
-			}
-			params.Set(k, v)
+			params.Set(k, trunc16(v, 64))
 		}
 	}
 	page := 1
@@ -1926,10 +1941,7 @@ func cleanSlug(s string) (string, error) {
 	if s == "" {
 		return "", fmt.Errorf("Slug required")
 	}
-	c := strings.ToLower(strings.TrimSpace(s))
-	if len(c) > 80 {
-		c = c[:80]
-	}
+	c := trunc16(strings.ToLower(strings.TrimSpace(s)), 80)
 	if !slugRe.MatchString(c) {
 		return "", fmt.Errorf("Invalid slug (a-z 0-9 - only)")
 	}
@@ -1942,11 +1954,8 @@ func cleanQuery(q string) (string, error) {
 	if q == "" {
 		return "", fmt.Errorf("Query required")
 	}
-	c := strings.TrimSpace(multiWsRe.ReplaceAllString(q, " "))
-	if len(c) > 100 {
-		c = c[:100]
-	}
-	if len(c) < 2 {
+	c := trunc16(strings.TrimSpace(multiWsRe.ReplaceAllString(q, " ")), 100)
+	if n16(c) < 2 {
 		return "", fmt.Errorf("Query too short")
 	}
 	return c, nil

@@ -433,24 +433,27 @@ fn sel(s: &str) -> Selector {
     Selector::parse(s).expect("selector")
 }
 fn txt(s: &str, max: usize) -> String {
-    let t: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    let t = t.trim().to_string();
+    let t = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let t = t.trim();
     // JS .slice(max) semantics: count UTF-16 code units, never split a rune
-    let n16: usize = t.chars().map(|c| if (c as u32) > 0xFFFF { 2 } else { 1 }).sum();
-    if n16 > max {
-        let mut acc = 0usize;
-        let mut end = t.len();
-        for (i, c) in t.char_indices() {
-            if acc >= max {
-                end = i;
-                break;
-            }
-            acc += if (c as u32) > 0xFFFF { 2 } else { 1 };
+    if n16(t) > max { trunc16(t, max) } else { t.to_string() }
+}
+/// Count UTF-16 code units (JS `String.length`) — the unit the TS reference clamps in.
+fn n16(s: &str) -> usize {
+    s.chars().map(|c| if (c as u32) > 0xFFFF { 2 } else { 1 }).sum()
+}
+/// Cap a string to `max` UTF-16 code units (JS `.slice(max)` semantics),
+/// never splitting a rune. Byte-indexed `String::truncate` panics on multibyte
+/// input, so every user-facing clamp must go through this.
+fn trunc16(s: &str, max: usize) -> String {
+    let mut acc = 0usize;
+    for (i, c) in s.char_indices() {
+        if acc >= max {
+            return s[..i].to_string();
         }
-        t[..end].to_string()
-    } else {
-        t
+        acc += if (c as u32) > 0xFFFF { 2 } else { 1 };
     }
+    s.to_string()
 }
 fn num_in(s: &str) -> String {
     s.chars().filter(|c| c.is_ascii_digit() || *c == '.').collect::<String>().trim().to_string()
@@ -780,10 +783,7 @@ async fn advanced_search(opts: &HashMap<String, String>) -> Result<Value, String
     for k in ADV_KEYS {
         if let Some(v) = opts.get(*k) {
             if !v.is_empty() {
-                let mut vv = v.clone();
-                if vv.len() > 64 {
-                    vv.truncate(64);
-                }
+                let vv = trunc16(v, 64);
                 parts.push((k.to_string(), vv));
             }
         }
@@ -1454,10 +1454,7 @@ fn clean_slug(s: &str) -> Result<String, String> {
     if s.is_empty() {
         return Err("Slug required".into());
     }
-    let mut c = s.trim().to_lowercase();
-    if c.len() > 80 {
-        c.truncate(80);
-    }
+    let c = trunc16(&s.trim().to_lowercase(), 80);
     static R: OnceLock<Regex> = OnceLock::new();
     let r = R.get_or_init(|| Regex::new(r"^[a-z0-9-]+$").unwrap());
     if !r.is_match(&c) {
@@ -1469,12 +1466,8 @@ fn clean_query(q: &str) -> Result<String, String> {
     if q.is_empty() {
         return Err("Query required".into());
     }
-    let mut c: String = q.split_whitespace().collect::<Vec<_>>().join(" ");
-    c = c.trim().to_string();
-    if c.len() > 100 {
-        c.truncate(100);
-    }
-    if c.len() < 2 {
+    let c = trunc16(&q.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string(), 100);
+    if n16(&c) < 2 {
         return Err("Query too short".into());
     }
     Ok(c)

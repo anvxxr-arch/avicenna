@@ -44,7 +44,9 @@ function getHeaders(): Record<string, string> {
   };
 }
 
-async function fetchHTML(url: string): Promise<string> {
+async function fetchHTML(rawUrl: string): Promise<string> {
+  // every request is origin-pinned; also trims the UTF-8 BOM some pages prepend
+  const url = site.sanitizeUrl(rawUrl);
   const res = await fetch(url, {
     headers: getHeaders(),
     redirect: 'follow',
@@ -52,7 +54,7 @@ async function fetchHTML(url: string): Promise<string> {
   });
   jar.update(res);
   if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${url}`);
-  return res.text();
+  return (await res.text()).replace(/^\uFEFF/, '');
 }
 
 function decodeEntities(str: string): string {
@@ -347,6 +349,7 @@ async function detail(slug: string): Promise<Rec> {
 }
 
 async function episode(slug: string): Promise<Rec> {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error('Invalid episode slug');
   const url = `${BASE_URL}/${slug}/`;
   const $ = cheerio.load(await fetchHTML(url));
   const title = $('h1.title').text().trim() || $('title').text().trim();

@@ -31,9 +31,11 @@ export interface Site {
 
 const BLOCKED_HOST_RE = /^(localhost|127\.|0\.0\.0\.0|\[::|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/i;
 
+/** IPv6 literals that must never be fetched: loopback/unspecified, IPv4-mapped, unique-local, link-local. */
+const BLOCKED_V6_RE = /^(?:::1?|::ffff:|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i;
 export function isBlockedHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  return BLOCKED_HOST_RE.test(h) || h === 'localhost' || h === '::1';
+  return BLOCKED_HOST_RE.test(h) || BLOCKED_V6_RE.test(h) || h === 'localhost';
 }
 
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
@@ -172,7 +174,8 @@ export function createSite(cfg: SiteConfig): Site {
 
   async function doFetch(url: string, init?: RequestInit, redirects = 0): Promise<string> {
     let cur = url;
-    for (let r = 0; r <= MAX_REDIRECTS; r++) {
+    let hops = redirects;
+    for (;;) {
       const ctrl = AbortSignal.timeout(TIMEOUT_MS);
       let res: Response;
       try {
@@ -186,34 +189,29 @@ export function createSite(cfg: SiteConfig): Site {
         const loc = res.headers.get('location');
         await res.body?.cancel().catch(() => {});
         if (!loc) throw new Error(`Redirect ${res.status} without location`);
-        if (redirects + r >= MAX_REDIRECTS) throw new Error('Too many redirects');
+        if (++hops > MAX_REDIRECTS) throw new Error('Too many redirects');
         cur = resolveUrl(loc, cur);
         continue;
       }
-      if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
-        await res.body?.cancel().catch(() => {});
-        const err = new Error(`HTTP ${res.status} for ${cur}`) as Error & { retryable?: boolean; retryAfter?: number };
-        err.retryable = true;
-        const ra = res.headers.get('retry-after');
-        if (ra) { const n = Number(ra); if (Number.isFinite(n)) err.retryAfter = n * 1000; }
-        throw err;
-      }
-      if (res.status === 403 || res.status === 401 || res.status === 503) {
-        try {
-          const peek = await readCapped(res);
-          if (/attention required|just a moment|cf-challenge|captcha|you have been blocked/i.test(peek)) {
-            throw new Error(`WAF blocked (Cloudflare) for ${cur} — filter params trip bot protection; retry with fewer filters`);
-          }
-        } catch (e) {
-          if (e instanceof Error && e.message.startsWith('WAF blocked')) throw e;
+      // Any of these may be a Cloudflare interstitial — inspect the body BEFORE
+      // deciding to retry, so a challenge is reported instead of retried 4×.
+      if (res.status === 429 || res.status === 403 || res.status === 401 || res.status >= 500) {
+        const peek = await readCapped(res).catch(() => '');
+        if (/attention required|just a moment|cf-challenge|captcha|you have been blocked/i.test(peek)) {
+          throw new Error(`WAF blocked (Cloudflare) for ${cur} — filter params trip bot protection; retry with fewer filters`);
+        }
+        if (res.status === 429 || res.status >= 500) {
+          const err = new Error(`HTTP ${res.status} for ${cur}`) as Error & { retryable?: boolean; retryAfter?: number };
+          err.retryable = true;
+          const ra = res.headers.get('retry-after');
+          if (ra) { const n = Number(ra); if (Number.isFinite(n)) err.retryAfter = n * 1000; }
+          throw err;
         }
         throw new Error(`HTTP ${res.status} for ${cur}`);
       }
       if (res.status < 200 || res.status >= 300) { await res.body?.cancel().catch(() => {}); throw new Error(`HTTP ${res.status} for ${cur}`); }
-      void redirects;
       return await readCapped(res);
     }
-    throw new Error('Too many redirects');
   }
 
   async function withRetry(fn: () => Promise<string>): Promise<string> {

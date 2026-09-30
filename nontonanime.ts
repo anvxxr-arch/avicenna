@@ -11,6 +11,7 @@ import {
   sliceBalanced, extractPageVar, extractEmbedUrl, extractEpisodeFromUrl, extractPostId,
 } from './core/parse';
 import { createSite } from './core/fetch';
+import { defineCli } from './core/cli';
 
 declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
 
@@ -599,7 +600,7 @@ const SEASONS = new Set(['spring', 'summer', 'fall', 'autumn', 'winter']);
 async function getSeasonAnime(season: string, year?: number, page = 1): Promise<SeasonResult[]> {
   const s = season.toLowerCase().trim();
   if (!SEASONS.has(s)) throw new Error('Season must be spring/summer/fall/winter');
-  if (year === undefined) throw new Error('Year required (e.g. season winter 2024)');
+  if (year === undefined || !Number.isFinite(Number(year))) throw new Error('Year required (e.g. season winter 2024)');
   const y = clampInt(year, 1990, 2100);
   page = clampPage(page);
   const base = `${BASE}/premiereds/${s}-${y}/`;
@@ -630,9 +631,9 @@ function cleanQuery(q: string): string {
   return c;
 }
 
-// === CLI ===
-function printUsage(): void {
-  console.log(`
+// === CLI === (shared runner: uniform flag parsing, help, [ERROR]→stderr exit 1)
+/** Full usage text; the shared runner prints it as the banner. */
+const USAGE = `
 NontonAnimeID Scraper - Hardened & Optimized v2
 ===============================================
 Usage:
@@ -675,74 +676,77 @@ Examples:
   bun nontonanime.ts anime "https://s13.nontonanimeid.boats/anime/one-piece/"
   bun nontonanime.ts episode "https://s13.nontonanimeid.boats/episode/one-piece-episode-1000/"
   bun nontonanime.ts advsearch --genre=action --sort=series_skor
-  bun nontonanime.ts season winter 2024
-`);
-}
-
-function parseArgs(): { cmd: string; pos: string[]; flags: Record<string, string> } {
-  const pos: string[] = [];
-  const flags: Record<string, string> = {};
-  for (const arg of process.argv.slice(2)) {
-    if (arg.startsWith('--')) {
-      const eq = arg.indexOf('=');
-      if (eq === -1) flags[arg.slice(2)] = '';
-      else flags[arg.slice(2, eq)] = arg.slice(eq + 1).slice(0, 200);
-    } else pos.push(arg);
-  }
-  return { cmd: pos[0] || '', pos, flags };
-}
-
-function out(v: unknown): void { console.log(JSON.stringify(v, null, 2)); }
-
+  bun nontonanime.ts season winter 2024`;
+/** One-line help entries for the shared runner table. */
+const DESC: Record<string, string> = {
+  home: 'Homepage lengkap', latest: 'Episode terbaru', recent: '= latest (alias, /recent/ retired)',
+  search: 'Cari anime', advsearch: 'Advanced search', list: 'Daftar anime',
+  anime: 'Detail anime + episode list', episode: 'Info episode + server + download',
+  stream: 'Streaming server (default 1-8)', servers: 'List 8 video servers (tabs)',
+  resolve: 'Resolve server -> real embed URL (player_ajax)', nav: 'Prev / all / next + episode number',
+  meta: 'Series title/url, poster, genres (JSON-LD)', genres: 'Daftar semua genre',
+  genre: 'Anime berdasarkan genre', ongoing: 'Anime ongoing/tayang', popular: 'Anime populer per genre',
+  schedule: 'Jadwal rilis (7 hari + jam tayang)', top: 'Top rating (dari popular)',
+  season: 'Anime per season (premiereds)', more: 'Homepage infinite-scroll (loadmore AJAX)',
+};
+const USAGE_HINT: Record<string, string> = {
+  home: '[page]', latest: '[page]', recent: '[page]', search: '<query>', advsearch: '[opts]',
+  list: '[page]', anime: '<url>', episode: '<url>', stream: '<url> [server-num]', servers: '<url>',
+  resolve: '<url> [n|name]', nav: '<url>', meta: '<url>', genres: '[az|popular|ongoing]',
+  genre: '<slug> [page]', ongoing: '[sort]', season: '<season> <year> [page]', more: '--offset=N [ids..]',
+};
 function need(v: string | undefined, msg: string): string {
   if (!v) throw new Error(msg);
   return v;
 }
 const pg = (v: string | undefined): number => clampPage(parseInt(v || '1'));
-
-/** Command dispatch table (replaces the switch behemoth). Each handler gets (pos, flags). */
+/** Command dispatch table. `pos` excludes the command name (shared runner contract). */
 const COMMANDS: Record<string, (pos: string[], flags: Record<string, string>) => Promise<unknown>> = {
-  home: (p) => getHomeContent(pg(p[1])),
-  latest: (p) => getLatestEpisodes(pg(p[1])),
-  recent: (p) => getRecentEpisodes(pg(p[1])),
-  search: (p) => searchAnime(cleanQuery(p[1] || '')),
+  home: (p) => getHomeContent(pg(p[0])),
+  latest: (p) => getLatestEpisodes(pg(p[0])),
+  recent: (p) => getRecentEpisodes(pg(p[0])),
+  search: (p) => searchAnime(cleanQuery(p.join(' '))),
   advsearch: (_p, f) => advancedSearch(f as AdvancedSearchOpts),
-  list: (p) => getList(pg(p[1])),
-  anime: (p) => getAnimeDetail(need(p[1], 'Anime URL required')),
-  episode: (p) => getEpisodeInfo(need(p[1], 'Episode URL required')),
-  stream: (p) => getEpisodeStream(need(p[1], 'Episode URL required'), clampInt(parseInt(p[2] || '1'), 1, 20)),
-  servers: (p) => getEpisodeServers(need(p[1], 'Episode URL required')),
-  resolve: (p) => resolveServer(need(p[1], 'Episode URL required'), p[2] || 1),
-  nav: (p) => getEpisodeNav(need(p[1], 'Episode URL required')),
-  meta: (p) => getEpisodeMeta(need(p[1], 'Episode URL required')),
-  genres: (p) => getGenres(p[1]),
-  genre: (p) => getGenreAnime(need(p[1], 'Genre slug required'), pg(p[2])),
-  ongoing: (p) => getOngoingAnime(p[1]),
+  list: (p) => getList(pg(p[0])),
+  anime: (p) => getAnimeDetail(need(p[0], 'Anime URL required')),
+  episode: (p) => getEpisodeInfo(need(p[0], 'Episode URL required')),
+  stream: (p) => getEpisodeStream(need(p[0], 'Episode URL required'), clampInt(parseInt(p[1] || '1'), 1, 20)),
+  servers: (p) => getEpisodeServers(need(p[0], 'Episode URL required')),
+  resolve: (p) => resolveServer(need(p[0], 'Episode URL required'), p[1] || 1),
+  nav: (p) => getEpisodeNav(need(p[0], 'Episode URL required')),
+  meta: (p) => getEpisodeMeta(need(p[0], 'Episode URL required')),
+  genres: (p) => getGenres(p[0]),
+  genre: (p) => getGenreAnime(need(p[0], 'Genre slug required'), pg(p[1])),
+  ongoing: (p) => getOngoingAnime(p[0]),
   popular: () => getPopularSeries(),
   schedule: () => getSchedule(),
   top: () => getTopAnime(),
   season: (p) => getSeasonAnime(
-    need(p[1], 'Season required (spring/summer/fall/winter)'),
-    parseInt(need(p[2], 'Year required (e.g. season winter 2024)')), pg(p[3]),
+    need(p[0], 'Season required (spring/summer/fall/winter)'),
+    parseInt(need(p[1], 'Year required (e.g. season winter 2024)')), pg(p[2]),
   ),
-  more: (p, f) => loadMoreHome(p.slice(1).map(Number).filter(Number.isFinite), parseInt(f.offset || '0') || 0),
+  more: (p, f) => loadMoreHome(p.map(Number).filter(Number.isFinite), parseInt(f.offset || '0') || 0),
 };
-
-async function main(): Promise<void> {
-  const { cmd, pos, flags } = parseArgs();
-  if (!cmd || cmd === 'help' || cmd === '--help') { printUsage(); return; }
-  const run = COMMANDS[cmd];
-  if (!run) { console.error(`Unknown command: ${cmd}`); printUsage(); return; }
-  try {
-    out(await run(pos, flags));
-  } catch (error) {
-    console.error(`[ERROR] ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
-}
-
 // @ts-ignore - bun/direct-run entrypoint
-if (import.meta.main) await main();
+if (import.meta.main) {
+  defineCli({
+    name: 'nontonanime',
+    title: 'NontonAnimeID Scraper - Hardened & Optimized v2',
+    commands: Object.fromEntries(Object.entries(COMMANDS).map(([name, run]) => [
+      name,
+      {
+        desc: DESC[name] || '',
+        usage: USAGE_HINT[name],
+        // advsearch + more take value flags in space form; everything else is switch-only
+        flags: name === 'advsearch'
+          ? Object.fromEntries(ADV_KEYS.map((k) => [k, 'value' as const]))
+          : name === 'more' ? { offset: 'value' as const } : undefined,
+        run,
+      },
+    ])),
+    examples: USAGE.slice(USAGE.indexOf('Advanced Search Options')),
+  });
+}
 
 export {
   fetchPage, postAjax, getLatestEpisodes, getHomeContent, searchAnime, advancedSearch,

@@ -202,6 +202,7 @@ if (import.meta.main) {
     commands: {
       chat: {
         desc: 'Tanya SakanaAI', usage: '<question> [--model namazu] [--search] [--thinking] [--stream]',
+        flags: { model: 'value' },
         run: async (pos, flags) => {
           const question = pos.join(' ');
           const result = await chat(question, {

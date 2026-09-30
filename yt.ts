@@ -284,12 +284,14 @@ async function infoPlaylist(id: string): Promise<Record<string, unknown>> {
 }
 
 function parsePanelVideo(v: Record<string, unknown>): Record<string, unknown> {
+  const runs = (x: unknown): Array<{ text: string }> | undefined =>
+    ((x as { runs?: Array<{ text: string }> } | undefined)?.runs);
   return {
     type: 'video',
     id: v.videoId,
-    title: text(v.title as Array<{ text: string }>),
-    channel: text(v.longBylineText as Array<{ text: string }>),
-    length: text(v.lengthText as Array<{ text: string }>),
+    title: text(runs(v.title)),
+    channel: text(runs(v.longBylineText)),
+    length: text(runs(v.lengthText)),
     selected: v.selected || false,
     thumbnail: thumbnail((v.thumbnail as { thumbnails?: Array<{ url: string; width?: number }> } | undefined)?.thumbnails),
   };

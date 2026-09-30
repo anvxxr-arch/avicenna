@@ -475,7 +475,16 @@ if (import.meta.main) {
     name: 'ytmusic',
     title: 'YouTube Music Scraper',
     commands: {
-      search: { desc: `Search (filters: ${Object.keys(FILTERS).join('|')})`, usage: '<query> [filter]', run: async (p) => { if (!p[0]) throw new Error('Query required'); return search(p.join(' '), p[p.length - 1] && FILTERS[p[p.length - 1]] ? p.pop()! : undefined); } },
+      search: {
+        desc: `Search (filters: ${Object.keys(FILTERS).join('|')})`, usage: '<query> [filter]',
+        run: (p) => {
+          if (!p[0]) throw new Error('Query required');
+          const last = p[p.length - 1];
+          const filter = FILTERS[last] ? last : undefined;
+          if (filter) p.pop();
+          return search(p.join(' '), filter);
+        },
+      },
       info: { desc: 'Album/artist/playlist detail', usage: '<browseId>', run: async (p) => { if (!p[0]) throw new Error('browseId required'); return info(p[0]); } },
       lyrics: { desc: 'Lyrics (synced, with fallback)', usage: '<videoId>', run: async (p) => { if (!p[0]) throw new Error('videoId required'); return lyrics(p[0]); } },
       related: { desc: 'Up-next tracks', usage: '<videoId>', run: async (p) => { if (!p[0]) throw new Error('videoId required'); return related(p[0]); } },

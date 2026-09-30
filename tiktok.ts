@@ -175,10 +175,9 @@ async function getVideo(url: string): Promise<Record<string, unknown>> {
   const videoId = extractIdFromUrl(fullUrl);
   const { cookies, html } = await fetchTikTokPage(fullUrl);
 
-  let item = findItemStruct(parseApiData(html)) || findItemStruct(parseUniversal(html));
-
-  const info = extractVideo(item) as Record<string, unknown>;
-  if (!Object.keys(info).length || !info.id) {
+  const item = findItemStruct(parseApiData(html)) || findItemStruct(parseUniversal(html));
+  const info = (item ? extractVideo(item) : null) as Record<string, unknown> | null;
+  if (!info) {
     return { error: 'video tidak ditemukan (kemungkinan kena rate-limit)', url: fullUrl };
   }
   if (!info.id && videoId) info.id = videoId;

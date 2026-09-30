@@ -8,7 +8,7 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { defineCli } from './core/cli';
-import { createSite } from './core/fetch';
+import { createSite, isBlockedHost } from './core/fetch';
 import { safeCheerio, txt } from './core/parse';
 
 declare const Buffer: { from(data: string, enc?: string): { toString(enc?: string): string; byteLength(s: string): number } };
@@ -75,8 +75,7 @@ async function viewpagesource(target: string): Promise<unknown> {
   let u: URL;
   try { u = new URL(target); } catch { throw new Error('Target must be a valid URL'); }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('Target must be http(s)');
-  const host = u.hostname.toLowerCase();
-  if (/^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host === '::1') {
+  if (isBlockedHost(u.hostname)) {
     throw new Error('Private/loopback targets blocked');
   }
   const token = await getToken();

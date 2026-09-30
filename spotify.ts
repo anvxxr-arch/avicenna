@@ -48,33 +48,31 @@ async function getHtml(url: string): Promise<string | null> {
   }
 }
 
-async function getEmbed(type: string, id: string): Promise<Record<string, unknown> | null> {
-  const html = await getHtml('https://open.spotify.com/embed/' + type + '/' + id);
+/** `__NEXT_DATA__.props.pageProps.state` from an embed page, or null. */
+function embedState(html: string | null): Record<string, unknown> | null {
   if (!html) return null;
   const m = html.match(/__NEXT_DATA__.*?>(.*?)<\/script/s);
   if (!m) return null;
   try {
-    return (((JSON.parse(m[1]) as Record<string, unknown>).props as Record<string, unknown>).pageProps as Record<string, unknown>).state as never as Record<string, unknown> ? (((JSON.parse(m[1]) as Record<string, unknown>).props as Record<string, unknown>).pageProps as Record<string, unknown>).state as unknown as never : null;
+    const props = (JSON.parse(m[1]) as Record<string, unknown>).props as Record<string, unknown>;
+    return ((props.pageProps as Record<string, unknown>)?.state as Record<string, unknown>) ?? null;
   } catch {
     return null;
   }
 }
+async function getEmbed(type: string, id: string): Promise<Record<string, unknown> | null> {
+  const state = embedState(await getHtml('https://open.spotify.com/embed/' + type + '/' + id));
+  // the preview payload lives at state.data.entity (legacy contract)
+  return (state?.data as Record<string, unknown> | undefined)?.entity as Record<string, unknown> ?? null;
+}
 
 async function getAccessToken(): Promise<string | null> {
   if (cachedToken) return cachedToken;
-  const html = await getHtml('https://open.spotify.com/embed/track/6PQ88X9TkUIAUIZJHW2upE');
-  if (!html) return null;
-  const m = html.match(/__NEXT_DATA__.*?>(.*?)<\/script/s);
-  if (!m) return null;
-  try {
-    const parsed = JSON.parse(m[1]) as Record<string, unknown>;
-    const state = ((parsed.props as Record<string, unknown>).pageProps as Record<string, unknown>).state as Record<string, unknown>;
-    const token = ((state.settings as Record<string, unknown>).session as Record<string, unknown>).accessToken;
-    cachedToken = String(token);
-    return cachedToken;
-  } catch {
-    return null;
-  }
+  const state = embedState(await getHtml('https://open.spotify.com/embed/track/6PQ88X9TkUIAUIZJHW2upE'));
+  const token = ((state?.settings as Record<string, unknown> | undefined)?.session as Record<string, unknown> | undefined)?.accessToken;
+  if (!token) return null;
+  cachedToken = String(token);
+  return cachedToken;
 }
 
 type Rec = Record<string, unknown>;
@@ -549,10 +547,12 @@ if (import.meta.main) {
     commands: {
       home: {
         desc: 'Home page sections (--nodetail, --limit=N)', usage: '[--nodetail] [--limit=N]',
+        flags: { nodetail: 'bool', limit: 'value' },
         run: async (_p, f) => getHome(!f.nodetail, parseInt(f.limit || '0') || 0),
       },
       search: {
         desc: 'Full search', usage: '<query> [--limit=N]',
+        flags: { limit: 'value' },
         run: async (p, f) => {
           if (!p[0]) throw new Error('Missing query');
           return search(p.join(' '), parseInt(f.limit || '10') || 10);
