@@ -1,29 +1,37 @@
 [Unit]
-Description=NontonAnimeID JSON API (Bun)
+Description=Avicenna API (Go)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-# NOTE: User=/Group= omitted — systemd --user already runs as dwizzy;
+# NOTE: User=/Group= omitted — systemd --user already runs as this user;
 # setting User= in a user unit fails with status=216/GROUP (supplementary groups)
 WorkingDirectory=/home/dwizzy/avicenna
-# localhost-only — Cloudflare tunnel fronts this
+# localhost-only — the web proxy or a tunnel fronts this
 Environment=API_HOST=127.0.0.1
 Environment=API_PORT=8899
+Environment=API_CORS=0
 # set a real token via an env file (not committed):
 #   echo 'API_ADMIN_TOKEN=change-me' > /home/dwizzy/avicenna/deploy/api.env
 EnvironmentFile=-/home/dwizzy/avicenna/deploy/api.env
-ExecStart=/home/dwizzy/.bun/bin/bun api/nontonanime/server.ts
+ExecStart=%h/.local/bin/avicenna serve -addr 127.0.0.1:8899
 Restart=on-failure
 RestartSec=5
-# hardening
+
+# hardening: the API performs no filesystem writes
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-# the API performs no filesystem writes — the tree stays read-only
 ReadOnlyPaths=/home/dwizzy/avicenna
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=default.target

@@ -1264,18 +1264,12 @@ func buildOpenAPIDoc() map[string]interface{} {
 
 	// per-route envelope: {api, version, data: <payload>}
 	envelopeFor := func(payloadSchema string) map[string]interface{} {
-		data := map[string]interface{}{}
-		if strings.HasPrefix(payloadSchema, "#/components/schemas/") {
-			data = map[string]interface{}{"$ref": payloadSchema}
-		} else {
-			data = map[string]interface{}{"type": "object", "additionalProperties": true}
-		}
 		return map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"api":     map[string]interface{}{"type": "string", "const": apiName},
 				"version": map[string]interface{}{"type": "string", "const": apiVersion},
-				"data":    data,
+				"data":    map[string]interface{}{"$ref": "#/components/schemas/" + payloadSchema},
 			},
 			"required": []string{"api", "version", "data"},
 		}
@@ -1284,10 +1278,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 	paths := map[string]interface{}{}
 
 	for _, rt := range apiRoutes {
-		payloadSchema := "#/components/schemas/" + rt.PayloadName
-		if rt.PayloadName == "StreamUrl" {
-			payloadSchema = "" // bare string payload
-		}
+		payloadSchema := rt.PayloadName
 		respSchemaName := rt.RespSchema
 		envelope := envelopeFor(payloadSchema)
 		reg[respSchemaName] = envelope

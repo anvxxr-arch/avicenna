@@ -1,57 +1,95 @@
-# Deploy — nontonanime-api
+# Deploy — avicenna API + web
 
-## 1. Install systemd (user unit)
+Two processes, one origin:
+
+| process | command | port | role |
+|---|---|---|---|
+| `avicenna-api` | `avicenna serve -addr 127.0.0.1:8899` | 8899 | **all** `/api/v1/*` routes (Go, stdlib only) |
+| `avicenna-web` | `bun web/serve.ts` | 5173 | static frontend + same-origin `/api` proxy |
+
+The Bun API server (`api/nontonanime/server.ts`) is **retired**: it is kept only as a compatibility shim
+while the frontend is pointed at the Go server. See `specs/004-go-api-cutover/spec.md`.
+
+## 1. Build
+
+```bash
+go build -o ~/.local/bin/avicenna .          # API + scrapers, single binary
+bun install && bun web/build.ts              # frontend bundle -> web/dist
+```
+
+## 2. API — systemd user unit
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp deploy/nontonanime-api.service ~/.config/systemd/user/
-# admin token (optional, enables POST /admin/purge):
-echo 'API_ADMIN_TOKEN=<generate-one>' > deploy/api.env   # chmod 600, gitignored
+cp deploy/avicenna-api.service ~/.config/systemd/user/
+# admin token (optional, enables POST /api/v1/admin/purge):
+mkdir -p deploy && echo 'API_ADMIN_TOKEN=<generate-one>' > deploy/api.env   # chmod 600, gitignored
 systemctl --user daemon-reload
-systemctl --user enable --now nontonanime-api
-loginctl enable-linger dwizzy        # survive logout
+systemctl --user enable --now avicenna-api
+loginctl enable-linger "$USER"
 ```
 
-Health: `curl http://127.0.0.1:8899/api/nontonanime/health`
+Health: `curl http://127.0.0.1:8899/api/v1/health`
 
-## 2. Cloudflare Cache Rule (dashboard)
+## 3. Web — systemd user unit
+
+```bash
+cp deploy/avicenna-web.service ~/.config/systemd/user/
+systemctl --user enable --now avicenna-web
+```
+
+`web/serve.ts` serves `web/dist`, resolves SPA deep links (`/anime`, `/docs`, …) to `index.html`, and
+proxies `/api/*` to the Go server, so the browser never needs CORS in production.
+
+## 4. Cloudflare Cache Rule (dashboard)
 
 **Rules → Cache Rules → Create rule**
-- Name: `nontonanime-api-cache`
-- Match: `hostname eq <your-domain> and starts_with(http.request.uri.path, "/api/nontonanime/")`
+
+- Name: `avicenna-api-cache`
+- Match: `hostname eq <your-domain> and starts_with(http.request.uri.path, "/api/v1/")`
 - Action: **Cache eligibility → Eligible for cache**
-- Edge TTL: **"Use cache-control header if present, bypass cache-control and use provided TTL"** → NOT needed; default "respect origin" works because the API emits `s-maxage`
-- **Key point**: leave "Respect existing headers" semantics (default) — `no-store` routes (resolve/stream/health/purge) then bypass the edge automatically
-- Cache Key: default (full URI incl. query string) — query params are part of the API contract
+- Edge TTL: leave "respect origin" — the API emits `s-maxage`
+- **Key point**: because the API sets `Cache-Control: no-store` on nonce-derived routes
+  (`/stream`, `/resolve`, `/servers`, `/more`) and on every error, those bypass the edge automatically.
+- Cache Key: default (full URI incl. query string) — query params are part of the contract
 
-Result: cacheable routes cached at edge for `s-maxage` (10–60min), revalidate with `stale-while-revalidate`, nonce routes always origin.
-
-## 3. Purge flow
-
-Site content changed? Refresh the origin LRU (edge follows on next TTL):
+## 5. Purge flow
 
 ```bash
 curl -X POST -H "Authorization: Bearer $API_ADMIN_TOKEN" \
-  http://127.0.0.1:8899/api/nontonanime/admin/purge
-# -> {"purged": 37}
+  http://127.0.0.1:8899/api/v1/admin/purge
+# -> {"api":"nontonanime-go","version":"1","data":{"purged":N}}
 ```
 
-Full edge purge: Cloudflare dashboard → Caching → Purge Everything (or API zone purge).
+The token is accepted **only** via the `Authorization` header — never as a query parameter, which would
+leak it into access logs and browser history. Full edge purge stays dashboard-side
+(Cloudflare → Caching → Purge Everything).
 
-## 4. Verify cycle
+## 6. Verify cycle
 
 ```bash
-curl -sD- -o /dev/null http://127.0.0.1:8899/api/nontonanime/schedule | grep -iE 'cache-control|x-cache'
-# 1st: x-cache: MISS   (fetched)
-# 2nd: x-cache: PASS?  -> HIT expected: see note below
+curl -sD- -o /dev/null http://127.0.0.1:8899/api/v1/schedule | grep -iE 'cache-control|x-cache'
+# cacheable route: public, max-age=300, s-maxage=600, stale-while-revalidate=1200
+
+curl -sD- -o /dev/null "http://127.0.0.1:8899/api/v1/servers?url=<ep>" | grep -i cache-control
+# nonce route: no-store
+
+curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:8899/api/v1/anime?url=https://evil.com/x"
+# 400 (caller error, not 500)
+
+curl -s http://127.0.0.1:8899/api/v1/openapi.json | jq '.paths | keys'
 ```
 
-> NOTE: `x-cache` HIT/MISS is per-process in-memory LRU. The current `x-cache: PASS`
-> default on json() calls means routes don't yet report HIT/MISS — wiring the LRU
-> lookup outcome into the response header is tracked in spec 002 follow-up if needed.
-
-## 5. Logs
+## 7. Logs
 
 ```bash
-journalctl --user -u nontonanime-api -f
+journalctl --user -u avicenna-api -f
+journalctl --user -u avicenna-web -f
 ```
+
+## 8. Hardening notes
+
+- The API process only listens on loopback; expose it through the web proxy or a tunnel.
+- `deploy/avicenna-api.service` mounts the checkout read-only: the API performs no filesystem writes.
+- Secrets live in `deploy/api.env` (gitignored). `.githooks/pre-commit` blocks accidental commits;
+  enable it per clone with `git config core.hooksPath .githooks`.
