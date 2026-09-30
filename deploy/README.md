@@ -7,8 +7,8 @@ Two processes, one origin:
 | `avicenna-api` | `avicenna serve -addr 127.0.0.1:8899` | 8899 | **all** `/api/v1/*` routes (Go, stdlib only) |
 | `avicenna-web` | `bun web/serve.ts` | 5173 | static frontend + same-origin `/api` proxy |
 
-The Bun API server (`api/nontonanime/server.ts`) is **retired**: it is kept only as a compatibility shim
-while the frontend is pointed at the Go server. See `specs/004-go-api-cutover/spec.md`.
+The Bun API server is **removed** — the Go binary is the only backend (see
+`specs/004-go-api-cutover/spec.md`). Bun runs the frontend build + static server only.
 
 ## 1. Build
 

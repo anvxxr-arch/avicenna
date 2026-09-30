@@ -756,5 +756,5 @@ export {
   loadMoreHome, isValidUrl, sanitizeUrl,
 };
 
-// internal — consumed by api/nontonanime/server.ts (purge/health)
+// internal — legacy Bun server hooks (the Go server reports its own health)
 export const __cacheApi = site.cacheApi;

@@ -35,4 +35,4 @@ two route tables and two envelopes is a defect waiting to happen.
 1. Go server ships all anime routes (parity with the Bun server's outputs).
 2. `scrapers/` package ports land for the remaining sources; each is shape-checked against its TS CLI.
 3. Frontend points at the Go server.
-4. `api/nontonanime/server.ts` is removed from scripts and marked retired.
+4. `api/nontonanime/server.ts` is deleted (gone from the tree and from scripts).

@@ -81,7 +81,6 @@ core/                  shared transport (fetch/limiter/cache/guards), CLI runner
 nontonanime.go         Go port of the reference scraper + the HTTP server
 nontonanime-rs/        Rust port (parity-checked against the TS reference)
 scrapers/              Go ports of the non-anime scrapers
-api/nontonanime/       legacy Bun API server (superseded by `nontonanime serve`)
 web/                   React frontend (src/, build.ts bundler, serve.ts SPA server)
 tools/                 parity suite, contract gate, golden diff, secret scanner
 specs/                 spec-kit feature specs, plans, tasks and contract files

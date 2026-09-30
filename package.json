@@ -15,7 +15,6 @@
   "scripts": {
     "parity": "bun tools/parity.ts --live",
     "parity:guards": "bun tools/parity.ts --guards-only",
-    "api": "bun api/nontonanime/server.ts",
     "anilist": "bun anilist.ts",
     "animeindo": "bun animeindo.ts",
     "codeengo": "bun codeengo.ts",
