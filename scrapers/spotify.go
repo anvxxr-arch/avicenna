@@ -445,14 +445,29 @@ func spotifyReleases(group any) []any {
 
 func spotifyArtist(id string) (map[string]any, error) {
 	uri := "spotify:artist:" + id
-	overview, _ := spotifyGraph("queryArtistOverview", spotifyHashes["artist"], map[string]any{
-		"uri": uri, "locale": "", "includePrerelease": false,
-	})
-	related, _ := spotifyGraph("queryArtistRelated", spotifyHashes["artistRelated"], map[string]any{"uri": uri})
-	disc, _ := spotifyGraph("queryArtistDiscographyAll", spotifyHashes["artistDiscography"], map[string]any{
-		"uri": uri, "offset": 0, "limit": 100,
-		"includePrerelease": false, "includeSingles": true, "includeAlbums": true, "includeCompilations": true,
-	})
+	// Three independent GraphQL calls, same fan-out as the TS reference.
+	type graphResult = map[string]any
+	calls := []func() graphResult{
+		func() graphResult {
+			r, _ := spotifyGraph("queryArtistOverview", spotifyHashes["artist"], map[string]any{
+				"uri": uri, "locale": "", "includePrerelease": false,
+			})
+			return r
+		},
+		func() graphResult {
+			r, _ := spotifyGraph("queryArtistRelated", spotifyHashes["artistRelated"], map[string]any{"uri": uri})
+			return r
+		},
+		func() graphResult {
+			r, _ := spotifyGraph("queryArtistDiscographyAll", spotifyHashes["artistDiscography"], map[string]any{
+				"uri": uri, "offset": 0, "limit": 100,
+				"includePrerelease": false, "includeSingles": true, "includeAlbums": true, "includeCompilations": true,
+			})
+			return r
+		},
+	}
+	res := MapConcurrent(calls, len(calls), func(fn func() graphResult) graphResult { return fn() })
+	overview, related, disc := res[0], res[1], res[2]
 	a := obj(overview["artistUnion"])
 	if a == nil {
 		return map[string]any{"error": "Artist not found"}, nil
@@ -683,10 +698,20 @@ func spotifyPlaylist(id string) (map[string]any, error) {
 }
 
 func spotifyShow(id string) (map[string]any, error) {
-	meta, _ := spotifyGraph("queryShowMetadataV2", spotifyHashes["show"], map[string]any{"uri": "spotify:show:" + id})
-	eps, _ := spotifyGraph("queryPodcastEpisodes", spotifyHashes["showEpisodes"], map[string]any{
-		"uri": "spotify:show:" + id, "offset": 0, "limit": 50,
-	})
+	calls := []func() map[string]any{
+		func() map[string]any {
+			r, _ := spotifyGraph("queryShowMetadataV2", spotifyHashes["show"], map[string]any{"uri": "spotify:show:" + id})
+			return r
+		},
+		func() map[string]any {
+			r, _ := spotifyGraph("queryPodcastEpisodes", spotifyHashes["showEpisodes"], map[string]any{
+				"uri": "spotify:show:" + id, "offset": 0, "limit": 50,
+			})
+			return r
+		},
+	}
+	res := MapConcurrent(calls, len(calls), func(fn func() map[string]any) map[string]any { return fn() })
+	meta, eps := res[0], res[1]
 	s := obj(meta["podcastUnionV2"])
 	if s == nil {
 		return map[string]any{"error": "Show not found"}, nil
@@ -1058,8 +1083,10 @@ func spotifyHome(withDetail bool, limit int) (map[string]any, error) {
 	if allSections == nil {
 		allSections = []any{}
 	}
-	sections := []any{}
-	for _, s := range allSections {
+	// Same fan-out shape as the TS reference: 3 sections in flight, 5 item
+	// detail fetches per section; the per-host limiter keeps the request rate
+	// identical to the sequential version.
+	sections := MapConcurrent(allSections, 3, func(s any) any {
 		so := obj(s)
 		items := mlist(so, "items")
 		if items == nil {
@@ -1068,17 +1095,16 @@ func spotifyHome(withDetail bool, limit int) (map[string]any, error) {
 		if limit > 0 && len(items) > limit {
 			items = items[:limit]
 		}
-		outItems := []any{}
-		for _, it := range items {
+		outItems := MapConcurrent(items, 5, func(it any) any {
 			io := obj(it)
 			base := map[string]any{"title": io["title"], "uri": io["uri"], "id": spotifyURITail(io["uri"]), "imageUrl": io["imageUrl"]}
 			if withDetail {
 				base["detail"] = spotifyDetailByURI(mstr(io, "uri"))
 			}
-			outItems = append(outItems, base)
-		}
-		sections = append(sections, map[string]any{"title": so["title"], "uri": so["uri"], "items": outItems})
-	}
+			return base
+		})
+		return map[string]any{"title": so["title"], "uri": so["uri"], "items": outItems}
+	})
 	return map[string]any{
 		"greeting":     home["greetingLabel"],
 		"sectionCount": len(sections),

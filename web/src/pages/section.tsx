@@ -29,14 +29,16 @@ const config: Record<string, SectionConfig> = {
   '/anime': {
     examples: [
       { name: 'home', path: '/home' },
-      { name: 'schedule', path: '/schedule' },
       { name: 'search', path: '/search', params: { q: 'one piece' }, input: { key: 'q', placeholder: 'search anime…' } },
+      { name: 'schedule', path: '/schedule' },
+      { name: 'genres', path: '/genres' },
+      { name: 'season', path: '/season', params: { season: 'summer', year: '2026' } },
     ],
     summarize: (d) => {
       let count = Array.isArray(d) ? d.length : 0;
       if (!Array.isArray(d) && d && typeof d === 'object' && 'series' in d) {
         const series = d.series;
-        if (Array.isArray(series)) count = series.length;
+        if (series && typeof series === 'object') count = Object.keys(series).length;
       }
       return [
         { label: 'items', value: String(count) },
@@ -44,46 +46,52 @@ const config: Record<string, SectionConfig> = {
       ];
     },
   },
-  '/youtube': {
-    examples: [
-      { name: 'search', path: '/youtube/search', params: { q: 'lofi hip hop' }, input: { key: 'q', placeholder: 'search videos…' } },
-      { name: 'info', path: '/youtube/info', params: { id: 'dQw4w9WgXcQ' } },
-      { name: 'music search', path: '/youtube-music/search', params: { q: 'bad habits', filter: 'songs' } },
-    ],
-  },
-  '/music': {
-    examples: [
-      { name: 'home', path: '/music/home' },
-      { name: 'search', path: '/music/search', params: { q: 'bad habits' }, input: { key: 'q', placeholder: 'track, artist, album…' } },
-    ],
-  },
   '/film': {
     examples: [
       { name: 'list', path: '/lk21/list' },
       { name: 'sections', path: '/lk21/sections' },
-      { name: 'detail', path: '/lk21/detail', params: { slug: 'uprising-2026' }, input: { key: 'slug', placeholder: 'film slug…' } },
+      { name: 'detail', path: '/lk21/detail', params: { args: 'uprising-2026' }, input: { key: 'args', placeholder: 'film slug…' } },
+    ],
+  },
+  '/music': {
+    examples: [
+      { name: 'home', path: '/spotify/home' },
+      { name: 'search', path: '/spotify/search', params: { args: 'bad habits' }, input: { key: 'args', placeholder: 'track, artist, album…' } },
+      { name: 'track', path: '/spotify/track', params: { args: '6PQ88X9TkUIAUIZJHW2upE' } },
+    ],
+  },
+  '/youtube': {
+    examples: [
+      { name: 'search', path: '/ytmusic/search', params: { args: 'lofi', filter: 'songs' }, input: { key: 'args', placeholder: 'search videos or songs…' } },
+      { name: 'music lyrics', path: '/ytmusic/lyrics', params: { args: 'dQw4w9WgXcQ' } },
+      { name: 'music related', path: '/ytmusic/related', params: { args: 'dQw4w9WgXcQ' } },
     ],
   },
   '/tiktok': {
     examples: [
-      { name: 'user', path: '/tiktok/user', params: { username: 'nasa' }, input: { key: 'username', placeholder: 'username' } },
-    ],
-  },
-  '/whitehouse': {
-    examples: [
-      { name: 'home', path: '/whitehouse/home' },
-      { name: 'news', path: '/whitehouse/sections', params: { section: 'news' } },
+      { name: 'user', path: '/tiktok/user', params: { args: 'nasa' }, input: { key: 'args', placeholder: 'username' } },
+      { name: 'video', path: '/tiktok/video', params: { args: 'https://www.tiktok.com/@nasa/video/7550073333098442007' } },
     ],
   },
   '/drowify': {
     examples: [
-      { name: 'search', path: '/drowify/search', params: { q: 'lofi' }, input: { key: 'q', placeholder: 'song…' } },
+      { name: 'search', path: '/drowify/search', params: { args: 'lofi' }, input: { key: 'args', placeholder: 'song…' } },
+      { name: 'suggest', path: '/drowify/suggest', params: { args: 'lofi' } },
+    ],
+  },
+  '/whitehouse': {
+    examples: [
+      { name: 'news', path: '/whitehouse/news' },
+      { name: 'videos', path: '/whitehouse/videos' },
+      { name: 'administration', path: '/whitehouse/administration' },
+      { name: 'search', path: '/whitehouse/search', params: { args: 'executive order' }, input: { key: 'args', placeholder: 'keyword…' } },
     ],
   },
   '/tools': {
     examples: [
-      { name: 'styles', path: '/tools/image/styles' },
-      { name: 'source', path: '/tools/source', params: { url: 'https://example.com' }, input: { key: 'url', placeholder: 'https://…' } },
+      { name: 'image styles', path: '/codeengo/styles' },
+      { name: 'source token', path: '/viewpagesource/token' },
+      { name: 'page source', path: '/viewpagesource/view', params: { args: 'https://example.com' }, input: { key: 'args', placeholder: 'https://…' } },
     ],
   },
 };

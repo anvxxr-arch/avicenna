@@ -29,51 +29,51 @@ export interface SectionDef {
 export const SECTIONS: SectionDef[] = [
   {
     path: '/anime', label: 'Anime', blurb: 'NontonAnimeID: home, search, detail, episode streams, schedule.',
-    endpoints: ['/home', '/search', '/anime', '/episode', '/stream', '/schedule'], runtime: 'go', status: 'live', source: 's13.nontonanimeid.boats',
+    endpoints: ['/home', '/search', '/anime', '/episode', '/stream', '/schedule', '/genre', '/season', '/more'], runtime: 'go', status: 'live', source: 's13.nontonanimeid.boats',
   },
   {
     path: '/film', label: 'Film', blurb: 'LK21 movie listings, sections and per-title detail with download links.',
-    endpoints: ['/lk21/list', '/lk21/sections', '/lk21/detail'], runtime: 'go', status: 'live', source: 'tv12.lk21official.cc',
+    endpoints: ['/lk21/list', '/lk21/sections', '/lk21/detail', '/lk21/list-detail'], runtime: 'go', status: 'live', source: 'tv12.lk21official.cc',
   },
   {
     path: '/manga', label: 'Manga', blurb: 'Manga catalogue search and chapter metadata.',
-    endpoints: ['/manga/search', '/manga/detail'], runtime: 'go', status: 'planned', source: '—',
+    endpoints: ['/manga (planned)'], runtime: 'go', status: 'planned', source: '—',
   },
   {
     path: '/music', label: 'Music', blurb: 'Spotify open-web graph: tracks, albums, artists, playlists, podcasts.',
-    endpoints: ['/music/home', '/music/search', '/music/track'], runtime: 'go', status: 'live', source: 'open.spotify.com',
+    endpoints: ['/spotify/home', '/spotify/search', '/spotify/track', '/spotify/album', '/spotify/artist', '/spotify/playlist', '/spotify/show', '/spotify/episode'], runtime: 'go', status: 'live', source: 'open.spotify.com',
   },
   {
     path: '/youtube', label: 'YouTube', blurb: 'm.youtube + YouTube Music: search, video info, mixes, lyrics.',
-    endpoints: ['/youtube/search', '/youtube/info', '/youtube/related', '/youtube-music/search'], runtime: 'go', status: 'live', source: 'm.youtube.com',
+    endpoints: ['/youtube', '/ytmusic/search', '/ytmusic/info', '/ytmusic/lyrics', '/ytmusic/related', '/ytmusic/download'], runtime: 'go', status: 'live', source: 'm.youtube.com',
   },
   {
     path: '/tiktok', label: 'TikTok', blurb: 'Video stats, no-watermark URLs and public profile data.',
-    endpoints: ['/tiktok/video', '/tiktok/user'], runtime: 'go', status: 'live', source: 'www.tiktok.com',
+    endpoints: ['/tiktok/video', '/tiktok/user', '/tiktok/download'], runtime: 'go', status: 'live', source: 'www.tiktok.com',
   },
   {
     path: '/instagram', label: 'Instagram', blurb: 'Public post/profile metadata.',
-    endpoints: ['/instagram/post', '/instagram/profile'], runtime: 'go', status: 'planned', source: '—',
+    endpoints: ['/instagram (planned)'], runtime: 'go', status: 'planned', source: '—',
   },
   {
     path: '/facebook', label: 'Facebook', blurb: 'Public page and video metadata.',
-    endpoints: ['/facebook/page'], runtime: 'go', status: 'planned', source: '—',
+    endpoints: ['/facebook (planned)'], runtime: 'go', status: 'planned', source: '—',
   },
   {
     path: '/twitter', label: 'Twitter', blurb: 'Public timeline and post metadata.',
-    endpoints: ['/twitter/post'], runtime: 'go', status: 'planned', source: '—',
+    endpoints: ['/twitter (planned)'], runtime: 'go', status: 'planned', source: '—',
   },
   {
     path: '/drowify', label: 'Drowify', blurb: 'Music search, artists, albums and timed lyrics.',
-    endpoints: ['/drowify/search', '/drowify/artist', '/drowify/lyrics'], runtime: 'go', status: 'degraded', source: 'drowify-music.biz.id',
+    endpoints: ['/drowify/search', '/drowify/artist', '/drowify/album', '/drowify/lyrics', '/drowify/suggest', '/drowify/audio'], runtime: 'go', status: 'degraded', source: 'drowify-music.biz.id',
   },
   {
     path: '/whitehouse', label: 'WhiteHouse', blurb: 'Press releases, briefings, presidential actions and videos.',
-    endpoints: ['/whitehouse/home', '/whitehouse/sections', '/whitehouse/search'], runtime: 'go', status: 'live', source: 'whitehouse.gov',
+    endpoints: ['/whitehouse/home', '/whitehouse/news', '/whitehouse/search', '/whitehouse/videos', '/whitehouse/administration'], runtime: 'go', status: 'live', source: 'whitehouse.gov',
   },
   {
     path: '/tools', label: 'Tools', blurb: 'Codeengo text-to-image, FreeConvert video compression, page-source capture.',
-    endpoints: ['/tools/image', '/tools/compress', '/tools/source'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
+    endpoints: ['/codeengo/styles', '/codeengo/generate', '/viewpagesource/token', '/viewpagesource/view'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
   },
 ];
 

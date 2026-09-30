@@ -3,7 +3,10 @@
 // guards, per-host rate limiting, timeouts, size caps and retry policy.
 package scrapers
 
-import "sort"
+import (
+	"sort"
+	"sync"
+)
 
 // Command is one CLI subcommand of a Scraper. Run receives the positional
 // arguments after the command name and the parsed --flags map (bare switches
@@ -47,4 +50,40 @@ func Find(name string) (Scraper, bool) {
 		}
 	}
 	return Scraper{}, false
+}
+
+// MapConcurrent maps fn over items with at most limit goroutines in flight,
+// preserving input order (mirrors the TS mapWithConcurrency helper). The
+// transport already serialises requests per host, so this wins on latency
+// without adding origin load.
+func MapConcurrent[T any, R any](items []T, limit int, fn func(T) R) []R {
+	out := make([]R, len(items))
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > len(items) {
+		limit = len(items)
+	}
+	var wg sync.WaitGroup
+	next := 0
+	var mu sync.Mutex
+	worker := func() {
+		defer wg.Done()
+		for {
+			mu.Lock()
+			i := next
+			next++
+			mu.Unlock()
+			if i >= len(items) {
+				return
+			}
+			out[i] = fn(items[i])
+		}
+	}
+	wg.Add(limit)
+	for w := 0; w < limit; w++ {
+		go worker()
+	}
+	wg.Wait()
+	return out
 }
