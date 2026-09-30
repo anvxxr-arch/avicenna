@@ -136,8 +136,9 @@ func sakanaSignupIDToken() (string, error) {
 //
 // The reference passes `redirect:'manual'`, but its core `request()` still throws
 // on any 3xx when `follow` is false — so a redirect here is an error, not a
-// cookie source (on the live site the login answers 2xx with Set-Cookie). The
-// hop therefore goes through the same redirect-refusing path as every other call.
+// cookie source. Beyond that the reference never looks at the status: it scans
+// the response headers for `sakana-chat=` and only fails when the cookie is
+// absent ("Failed to get session cookie").
 func sakanaLoginCookie(idToken string) (string, error) {
 	form := "idToken=" + EncodeURIComponent(idToken)
 	res, err := sakanaApi(sakanaBaseURL+"/api/auth/login", http.MethodPost,
@@ -149,9 +150,6 @@ func sakanaLoginCookie(idToken string) (string, error) {
 		})
 	if err != nil {
 		return "", err
-	}
-	if res.Status < 200 || res.Status >= 300 {
-		return "", fmt.Errorf("login HTTP %d", res.Status)
 	}
 	for _, raw := range res.Header.Values("Set-Cookie") {
 		name := raw

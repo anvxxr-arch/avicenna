@@ -125,8 +125,12 @@ func apiInternal(msg string) *apiFault {
 
 // Scraper-error classification — identical ordering/patterns to server.ts err().
 var (
-	apiBadReqRe   = regexp.MustCompile(`(?i)required|invalid|unknown|too short|must be|year required|not allowed|blocked|rejected|Illegal chars|scheme`)
-	apiUpstreamRe = regexp.MustCompile(`(?i)WAF blocked|HTTP (403|429|5\d\d)`)
+	// Client-side faults: the caller omitted or mangled an argument. Anything
+	// matched here answers 400, so the wording covers every scraper's guard
+	// ("Missing id", "Query required", "Parameter URL wajib", "Usage: …").
+	apiBadReqRe   = regexp.MustCompile(`(?i)required|missing|invalid|unknown|too short|must be|not allowed|blocked|rejected|Illegal chars|scheme|usage|wajib|harus`)
+	// Upstream faults: the origin answered with a refusal we cannot fix here.
+	apiUpstreamRe = regexp.MustCompile(`(?i)WAF blocked|HTTP (4\d\d|5\d\d)`)
 	apiHTTP404Re  = regexp.MustCompile(`(?i)HTTP 404`)
 )
 
