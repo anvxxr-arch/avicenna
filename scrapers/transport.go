@@ -202,6 +202,10 @@ type SiteConfig struct {
 	MaxRetries   int
 	CacheTTLMS   int
 	CacheMax     int
+	// ExtraHosts lists additional hosts a redirect may land on, in addition to
+	// the pinned origin. Never inferred — a hostile Location cannot reach an
+	// unlisted (e.g. private) host.
+	ExtraHosts []string
 }
 
 type cacheEntry struct {
@@ -228,6 +232,10 @@ type Site struct {
 	maxRetries   int
 	cacheTTL     int
 	cacheMax     int
+	extraHosts   []string
+
+	cookieMu sync.Mutex
+	cookies  map[string]string
 
 	mu       sync.Mutex
 	cache    map[string]cacheEntry
@@ -263,10 +271,17 @@ func NewSite(cfg SiteConfig) *Site {
 		}
 		return d
 	}
+	var extra []string
+	for _, h := range cfg.ExtraHosts {
+		if h = strings.ToLower(strings.TrimSpace(h)); h != "" {
+			extra = append(extra, h)
+		}
+	}
 	s := &Site{
 		base:         base,
 		host:         strings.ToLower(u.Hostname()),
 		headers:      cfg.Headers,
+		extraHosts:   extra,
 		limiter:      newRateLimiter(int64(intOr(cfg.RateMS, DefaultRateMS))),
 		timeoutMS:    intOr(cfg.TimeoutMS, DefaultTimeoutMS),
 		maxBytes:     intOr(cfg.MaxBytes, DefaultMaxBytes),
@@ -276,6 +291,7 @@ func NewSite(cfg SiteConfig) *Site {
 		cacheMax:     intOr(cfg.CacheMax, DefaultCacheMax),
 		cache:        map[string]cacheEntry{},
 		inflight:     map[string]*inflightCall{},
+		cookies:      map[string]string{},
 		external:     map[string]*Site{},
 	}
 	return s
@@ -397,15 +413,27 @@ type retryableError struct {
 func (e *retryableError) Error() string { return e.msg }
 
 func readCappedBytes(res *http.Response, maxBytes int) ([]byte, error) {
+	return readCappedBytesOpt(res, maxBytes, false)
+}
+
+// readRawCapped is readCappedBytes without the content-type guard, for
+// explicitly requested binary payloads (images, video).
+func readRawCapped(res *http.Response, maxBytes int) ([]byte, error) {
+	return readCappedBytesOpt(res, maxBytes, true)
+}
+
+func readCappedBytesOpt(res *http.Response, maxBytes int, skipContentType bool) ([]byte, error) {
 	if cl := res.Header.Get("Content-Length"); cl != "" {
 		if n, err := strconv.ParseInt(strings.TrimSpace(cl), 10, 64); err == nil && n > int64(maxBytes) {
 			return nil, fmt.Errorf("Body too large (%s bytes)", cl)
 		}
 	}
-	if ct := res.Header.Get("Content-Type"); ct != "" {
-		l := strings.ToLower(ct)
-		if strings.Contains(l, "image/") || strings.Contains(l, "video/") || strings.Contains(l, "octet-stream") {
-			return nil, fmt.Errorf("Unexpected content-type: %s", ct)
+	if !skipContentType {
+		if ct := res.Header.Get("Content-Type"); ct != "" {
+			l := strings.ToLower(ct)
+			if strings.Contains(l, "image/") || strings.Contains(l, "video/") || strings.Contains(l, "octet-stream") {
+				return nil, fmt.Errorf("Unexpected content-type: %s", ct)
+			}
 		}
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, int64(maxBytes)+1))
@@ -443,9 +471,53 @@ type requestSpec struct {
 	url     string
 	body    []byte
 	headers map[string]string
+	// extraHosts widens the redirect allowlist beyond the pinned origin.
+	extraHosts []string
+	// raw skips the content-type guard for explicitly requested binary payloads.
+	raw bool
 }
 
-// doFetch performs the request with manual redirect handling. Mirrors
+// allowedRedirectHost reports whether a redirect hop may land on `host`.
+func (s *Site) allowedRedirectHost(host string, extra []string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return false
+	}
+	if h == s.host {
+		return true
+	}
+	for _, allow := range extra {
+		if h == strings.ToLower(strings.TrimSpace(allow)) {
+			return true
+		}
+	}
+	for _, allow := range s.extraHosts {
+		if h == allow {
+			return true
+		}
+	}
+	return false
+}
+
+// applyHeaders sets the site defaults, per-request overrides and the page
+// origin/referer headers, plus the jar's cookie header for the target host.
+// Secrets in the jar are never logged.
+func (s *Site) applyHeaders(req *http.Request, extra map[string]string) {
+	for k, v := range s.headers {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set("origin", s.base)
+	req.Header.Set("referer", s.base+"/")
+	for k, v := range extra {
+		req.Header.Set(k, v)
+	}
+	if c := s.Cookie(req.URL.Hostname()); c != "" {
+		req.Header.Set("cookie", c)
+	}
+}
+
+// doFetch performs the request with manual redirect handling; every hop is
+// re-validated against the pinned host (plus spec.extraHosts). Mirrors
 // doFetch() in core/fetch.ts.
 func (s *Site) doFetch(spec requestSpec) ([]byte, error) {
 	cur := spec.url
@@ -461,12 +533,7 @@ func (s *Site) doFetch(spec requestSpec) ([]byte, error) {
 			cancel()
 			return nil, ErrInvalidURL
 		}
-		for k, v := range s.headers {
-			req.Header.Set(k, v)
-		}
-		for k, v := range spec.headers {
-			req.Header.Set(k, v)
-		}
+		s.applyHeaders(req, spec.headers)
 		client := &http.Client{
 			Transport: sharedTransport,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -483,6 +550,7 @@ func (s *Site) doFetch(spec requestSpec) ([]byte, error) {
 			}
 			return nil, &retryableError{msg: msg}
 		}
+		s.storeCookies(req.URL.Hostname(), res.Header.Values("Set-Cookie"))
 		if res.StatusCode >= 300 && res.StatusCode < 400 {
 			loc := res.Header.Get("Location")
 			res.Body.Close()
@@ -497,6 +565,13 @@ func (s *Site) doFetch(spec requestSpec) ([]byte, error) {
 			next, rerr := ResolveURL(loc, cur)
 			if rerr != nil {
 				return nil, rerr
+			}
+			nu, perr := url.Parse(next)
+			if perr != nil {
+				return nil, ErrInvalidURL
+			}
+			if !s.allowedRedirectHost(nu.Hostname(), spec.extraHosts) {
+				return nil, fmt.Errorf("Redirect host not allowed: %s", nu.Hostname())
 			}
 			cur = next
 			continue
@@ -536,6 +611,212 @@ func (s *Site) doFetch(spec requestSpec) ([]byte, error) {
 	}
 }
 
+// RequestSpec is a fully explicit same-host request (arbitrary headers,
+// uncached, optional bounded redirect following). Hosts, in addition to the
+// pinned origin, must be named in ExtraHosts.
+type RequestSpec struct {
+	Method     string
+	URL        string
+	Body       []byte
+	Headers    map[string]string
+	Follow     bool
+	ExtraHosts []string
+	// NoContentTypeCheck skips the "unexpected content-type" guard for binary
+	// payloads (images/video) that a scraper explicitly wants.
+	NoContentTypeCheck bool
+	// ManualRedirect returns a 3xx response untouched (Location intact).
+	ManualRedirect bool
+}
+
+// APIResult is the raw outcome of a request: status, headers and (captured)
+// body, including non-2xx responses whose error bodies are part of a site's
+// contract.
+type APIResult struct {
+	Status      int
+	Headers     http.Header
+	Body        []byte
+	ContentType string
+	URL         string // final URL after redirects
+}
+
+// BodyString returns the captured body as a UTF-8 string.
+func (r APIResult) BodyString() string { return string(r.Body) }
+
+// Do performs one guarded request and returns the raw response instead of
+// raising on non-2xx. It applies the site's limiter, timeout, redirect bound,
+// per-hop host allowlist and size cap; it never caches and never retries the
+// status (network errors and 429/5xx are retried like every other request).
+func (s *Site) Do(spec RequestSpec) (APIResult, error) {
+	var zero APIResult
+	target, err := s.resolveRequest(spec.URL)
+	if err != nil {
+		return zero, err
+	}
+	if len(spec.Body) > maxPostBodyBytes {
+		return zero, fmt.Errorf("POST body too large")
+	}
+	if spec.Method == "" {
+		spec.Method = "GET"
+	}
+	for _, h := range spec.ExtraHosts {
+		if IsBlockedHost(h) {
+			return zero, fmt.Errorf("Blocked host: %s", h)
+		}
+	}
+	var out APIResult
+	_, err = s.limiter.run(func() ([]byte, error) {
+		res, rerr := s.doRaw(requestSpec{
+			method:     spec.Method,
+			url:        target,
+			body:       spec.Body,
+			headers:    spec.Headers,
+			extraHosts: spec.ExtraHosts,
+			raw:        spec.NoContentTypeCheck,
+		}, spec.ManualRedirect)
+		if rerr != nil {
+			return nil, rerr
+		}
+		out = *res
+		return nil, nil
+	})
+	if err != nil {
+		return zero, err
+	}
+	return out, nil
+}
+
+func (s *Site) doRaw(spec requestSpec, manual bool) (*APIResult, error) {
+	return s.withRetryRaw(func() (*APIResult, error) { return s.doRawOnce(spec, manual) })
+}
+
+func (s *Site) withRetryRaw(fn func() (*APIResult, error)) (*APIResult, error) {
+	var last error = errors.New("failed")
+	for i := 0; i <= s.maxRetries; i++ {
+		v, err := fn()
+		if err == nil {
+			return v, nil
+		}
+		last = err
+		retryable := false
+		var backoff int64
+		var re *retryableError
+		if errors.As(err, &re) {
+			retryable = re.retryable
+			backoff = re.retryAfter
+		} else if netErrRe.MatchString(err.Error()) {
+			retryable = true
+		}
+		if !retryable || i == s.maxRetries {
+			return nil, last
+		}
+		if backoff == 0 {
+			backoff = int64(600) << uint(i)
+			if backoff > 8000 {
+				backoff = 8000
+			}
+		}
+		time.Sleep(time.Duration(backoff+rand.Int64N(300)) * time.Millisecond)
+	}
+	return nil, last
+}
+
+func (s *Site) doRawOnce(spec requestSpec, manual bool) (*APIResult, error) {
+	cur := spec.url
+	hops := 0
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.timeoutMS)*time.Millisecond)
+		var rdr io.Reader
+		if spec.body != nil {
+			rdr = bytes.NewReader(spec.body)
+		}
+		req, err := http.NewRequestWithContext(ctx, spec.method, cur, rdr)
+		if err != nil {
+			cancel()
+			return nil, ErrInvalidURL
+		}
+		s.applyHeaders(req, spec.headers)
+		client := &http.Client{
+			Transport: sharedTransport,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			cancel()
+			low := strings.ToLower(err.Error())
+			if errors.Is(err, context.DeadlineExceeded) || strings.Contains(low, "timeout") || strings.Contains(low, "deadline exceeded") {
+				return nil, fmt.Errorf("Timeout %dms for %s", s.timeoutMS, cur)
+			}
+			return nil, &retryableError{msg: err.Error()}
+		}
+		s.storeCookies(req.URL.Hostname(), res.Header.Values("Set-Cookie"))
+		if res.StatusCode >= 300 && res.StatusCode < 400 {
+			loc := res.Header.Get("Location")
+			if manual {
+				data, _ := readCappedBytes(res, s.maxBytes)
+				res.Body.Close()
+				cancel()
+				return &APIResult{Status: res.StatusCode, Headers: res.Header.Clone(), Body: data, ContentType: res.Header.Get("Content-Type"), URL: cur}, nil
+			}
+			res.Body.Close()
+			cancel()
+			if loc == "" {
+				return nil, fmt.Errorf("Redirect %d without location", res.StatusCode)
+			}
+			hops++
+			if hops > s.maxRedirects {
+				return nil, errors.New("Too many redirects")
+			}
+			next, rerr := ResolveURL(loc, cur)
+			if rerr != nil {
+				return nil, rerr
+			}
+			nu, perr := url.Parse(next)
+			if perr != nil {
+				return nil, ErrInvalidURL
+			}
+			if !s.allowedRedirectHost(nu.Hostname(), spec.extraHosts) {
+				return nil, fmt.Errorf("Redirect host not allowed: %s", nu.Hostname())
+			}
+			cur = next
+			continue
+		}
+		if res.StatusCode == 429 || res.StatusCode >= 500 {
+			peek, _ := readCapped(res, s.maxBytes)
+			res.Body.Close()
+			cancel()
+			if wafRe.MatchString(peek) {
+				return nil, fmt.Errorf("WAF blocked (Cloudflare) for %s — filter params trip bot protection; retry with fewer filters", cur)
+			}
+			var ra int64
+			if v := res.Header.Get("Retry-After"); v != "" {
+				if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+					ra = int64(n) * 1000
+				}
+			}
+			return nil, &retryableError{msg: fmt.Sprintf("HTTP %d for %s", res.StatusCode, cur), retryable: true, retryAfter: ra}
+		}
+		var data []byte
+		var rerr error
+		if spec.raw {
+			data, rerr = readRawCapped(res, s.maxBytes)
+		} else {
+			data, rerr = readCappedBytes(res, s.maxBytes)
+		}
+		status := res.StatusCode
+		ct := res.Header.Get("Content-Type")
+		hdr := res.Header.Clone()
+		res.Body.Close()
+		cancel()
+		if rerr != nil {
+			return nil, rerr
+		}
+		return &APIResult{Status: status, Headers: hdr, Body: data, ContentType: ct, URL: cur}, nil
+	}
+}
+
+// withRetry runs fn with bounded backoff on 429/5xx and network errors.
 func (s *Site) withRetry(fn func() ([]byte, error)) ([]byte, error) {
 	var last error = errors.New("failed")
 	for i := 0; i <= s.maxRetries; i++ {
@@ -628,7 +909,9 @@ func (s *Site) FetchRaw(pathOrURL string) ([]byte, error) {
 		return nil, err
 	}
 	return s.limiter.run(func() ([]byte, error) {
-		return s.doFetch(requestSpec{method: "GET", url: target})
+		return s.withRetry(func() ([]byte, error) {
+			return s.doFetch(requestSpec{method: "GET", url: target})
+		})
 	})
 }
 
@@ -693,25 +976,29 @@ type ExternalResult struct {
 // in core/fetch.ts, with the origin list made explicit per scraper.
 func (s *Site) External(rawURL string, body []byte, contentType string, extraHosts []string) (ExternalResult, error) {
 	var zero ExternalResult
-	u, err := ParseTarget(rawURL)
-	if err != nil {
+	if _, err := ParseTarget(rawURL); err != nil {
 		return zero, err
+	}
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return zero, ErrInvalidURL
 	}
 	allowed := map[string]bool{}
 	for _, h := range extraHosts {
 		h = strings.ToLower(strings.TrimSpace(h))
-		if h != "" {
-			allowed[h] = true
+		if h == "" {
+			continue
 		}
+		if IsBlockedHost(h) {
+			return zero, fmt.Errorf("Blocked host: %s", h)
+		}
+		allowed[h] = true
 	}
 	host := strings.ToLower(u.Hostname())
 	if !allowed[host] {
 		return zero, fmt.Errorf("External host rejected: %s", u.Hostname())
 	}
-	origin := u.Scheme + "://" + u.Host
-	child := s.externalSite(origin)
-	originHost := strings.ToLower(u.Hostname())
-
+	child := s.externalSite(u.Scheme + "://" + u.Host)
 	headers := map[string]string{}
 	if contentType != "" {
 		headers["content-type"] = contentType
@@ -720,55 +1007,27 @@ func (s *Site) External(rawURL string, body []byte, contentType string, extraHos
 	if body != nil {
 		method = "POST"
 	}
-	cur := u.String()
-	hops := 0
-	var raw []byte
-	var status int
-	var finalCT string
-	for {
-		res, err := child.oneShot(requestSpec{method: method, url: cur, body: body, headers: headers})
-		if err != nil {
-			return zero, err
-		}
-		if res.StatusCode >= 300 && res.StatusCode < 400 {
-			loc := res.Header.Get("Location")
-			next, rerr := ResolveURL(loc, cur)
-			res.Body.Close()
-			if rerr != nil {
-				return zero, rerr
-			}
-			nu, perr := url.Parse(next)
-			if perr != nil {
-				return zero, ErrInvalidURL
-			}
-			nh := strings.ToLower(nu.Hostname())
-			if nu.Scheme != u.Scheme || !allowed[nh] || nh != originHost {
-				return zero, fmt.Errorf("Redirect host not allowed: %s", nu.Hostname())
-			}
-			hops++
-			if hops > s.maxRedirects {
-				return zero, errors.New("Too many redirects")
-			}
-			cur = next
-			continue
-		}
-		data, rerr := readCappedBytes(res, s.maxBytes)
-		finalCT = res.Header.Get("Content-Type")
-		status = res.StatusCode
-		res.Body.Close()
-		if rerr != nil {
-			return zero, rerr
-		}
-		raw = data
-		break
+	res, err := child.Do(RequestSpec{
+		Method:             method,
+		URL:                u.String(),
+		Body:               body,
+		Headers:            headers,
+		Follow:             true,
+		ExtraHosts:         []string{host},
+		NoContentTypeCheck: true,
+	})
+	if err != nil {
+		return zero, err
 	}
-	return ExternalResult{Status: status, Body: raw, ContentType: finalCT, URL: cur}, nil
+	return ExternalResult{Status: res.Status, Body: res.Body, ContentType: res.ContentType, URL: res.URL}, nil
 }
 
 // oneShot performs exactly one request (no cache, no in-flight dedupe, no
 // retry) through the site limiter — the semantics of request() in core/fetch.ts.
 // Non-2xx is returned to the caller instead of raised, since these are
-// third-party documents whose error pages carry meaning.
+// third-party documents whose error pages carry meaning. The body is fully
+// buffered here so the per-request context can be cancelled on return; the
+// returned response's Body is an in-memory reader (headers are untouched).
 func (s *Site) oneShot(spec requestSpec) (*http.Response, error) {
 	var out *http.Response
 	var outErr error
@@ -784,12 +1043,7 @@ func (s *Site) oneShot(spec requestSpec) (*http.Response, error) {
 			outErr = ErrInvalidURL
 			return nil, outErr
 		}
-		for k, v := range s.headers {
-			req.Header.Set(k, v)
-		}
-		for k, v := range spec.headers {
-			req.Header.Set(k, v)
-		}
+		s.applyHeaders(req, spec.headers)
 		client := &http.Client{
 			Transport: sharedTransport,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -806,7 +1060,25 @@ func (s *Site) oneShot(spec requestSpec) (*http.Response, error) {
 			}
 			return nil, outErr
 		}
-		out = res
+		s.storeCookies(req.URL.Hostname(), res.Header.Values("Set-Cookie"))
+		data, rerr := readRawCapped(res, s.maxBytes)
+		res.Body.Close()
+		if rerr != nil {
+			outErr = rerr
+			return nil, outErr
+		}
+		// Rebuild the response with the buffered body: 3xx responses are handed
+		// back to the caller with headers (Location) intact.
+		body := io.NopCloser(bytes.NewReader(data))
+		out = &http.Response{
+			Status:        res.Status,
+			StatusCode:    res.StatusCode,
+			Proto:         res.Proto,
+			Header:        res.Header,
+			Body:          body,
+			ContentLength: int64(len(data)),
+			Request:       res.Request,
+		}
 		return nil, nil
 	})
 	if err != nil && outErr == nil {
@@ -841,6 +1113,190 @@ func (s *Site) externalSite(origin string) *Site {
 	return child
 }
 
+// === COOKIE JAR ===
+//
+// core/fetch.ts inherits the platform cookie behaviour: Set-Cookie from a
+// response is sent back on the next request to that host. The two flows that
+// depend on it (WordPress/Cloudflare nonce double-POSTs) are the reason this
+// exists; cookies never leave the pinned host and are never logged.
+
+// SetCookie seeds the jar for one host with an explicit Cookie header value.
+func (s *Site) SetCookie(host, header string) {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return
+	}
+	s.cookieMu.Lock()
+	defer s.cookieMu.Unlock()
+	if header == "" {
+		delete(s.cookies, h)
+		return
+	}
+	s.cookies[h] = header
+}
+
+// Cookie returns the Cookie header currently held for a host.
+func (s *Site) Cookie(host string) string {
+	s.cookieMu.Lock()
+	defer s.cookieMu.Unlock()
+	return s.cookies[strings.ToLower(strings.TrimSpace(host))]
+}
+
+// Cookies returns every stored cookie header keyed by host.
+func (s *Site) Cookies() map[string]string {
+	s.cookieMu.Lock()
+	defer s.cookieMu.Unlock()
+	out := make(map[string]string, len(s.cookies))
+	for k, v := range s.cookies {
+		out[k] = v
+	}
+	return out
+}
+
+// ClearCookies drops the whole jar.
+func (s *Site) ClearCookies() {
+	s.cookieMu.Lock()
+	defer s.cookieMu.Unlock()
+	s.cookies = map[string]string{}
+}
+
+// storeCookies merges Set-Cookie headers into the jar. Deletion (Max-Age<=0 or
+// a past Expires) removes the pair.
+func (s *Site) storeCookies(host string, values []string) {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" || len(values) == 0 {
+		return
+	}
+	s.cookieMu.Lock()
+	defer s.cookieMu.Unlock()
+	pairs := parseCookiePairs(s.cookies[h])
+	changed := false
+	for _, v := range values {
+		first := v
+		if i := strings.IndexByte(first, ';'); i >= 0 {
+			first = first[:i]
+		}
+		eq := strings.IndexByte(first, '=')
+		if eq <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(first[:eq])
+		val := strings.TrimSpace(first[eq+1:])
+		if name == "" || len(name) > 64 {
+			continue
+		}
+		expired := false
+		lower := strings.ToLower(v)
+		if i := strings.Index(lower, "max-age="); i >= 0 {
+			rest := lower[i+len("max-age="):]
+			if j := strings.IndexAny(rest, ";"); j >= 0 {
+				rest = rest[:j]
+			}
+			if n, err := strconv.Atoi(strings.TrimSpace(rest)); err == nil && n <= 0 {
+				expired = true
+			}
+		}
+		if expired || val == "" {
+			delete(pairs, name)
+			changed = true
+			continue
+		}
+		if pairs[name] != val {
+			pairs[name] = val
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	names := make([]string, 0, len(pairs))
+	for n := range pairs {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, n := range names {
+		parts = append(parts, n+"="+pairs[n])
+	}
+	if len(parts) == 0 {
+		delete(s.cookies, h)
+		return
+	}
+	s.cookies[h] = strings.Join(parts, "; ")
+}
+
+func parseCookiePairs(header string) map[string]string {
+	out := map[string]string{}
+	if header == "" {
+		return out
+	}
+	for _, part := range strings.Split(header, ";") {
+		eq := strings.IndexByte(part, '=')
+		if eq <= 0 {
+			continue
+		}
+		out[strings.TrimSpace(part[:eq])] = strings.TrimSpace(part[eq+1:])
+	}
+	return out
+}
+
+// FetchFollow GETs a site-pinned path/URL without caching, following redirects
+// with every hop re-validated against the pinned host (the JS `follow: true`
+// request option). Used by scrapers whose own site 301s to a canonical URL.
+func (s *Site) FetchFollow(pathOrURL string) (string, error) {
+	target, err := s.resolveRequest(pathOrURL)
+	if err != nil {
+		return "", err
+	}
+	b, err := s.oneShotBytes(requestSpec{method: "GET", url: target})
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// oneShotBytes is oneShot + body read + host pinning for redirect hops.
+func (s *Site) oneShotBytes(spec requestSpec) ([]byte, error) {
+	cur := spec.url
+	hops := 0
+	for {
+		res, err := s.oneShot(requestSpec{method: spec.method, url: cur, body: spec.body, headers: spec.headers})
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode >= 300 && res.StatusCode < 400 {
+			loc := res.Header.Get("Location")
+			res.Body.Close()
+			if loc == "" {
+				return nil, fmt.Errorf("Redirect %d without location", res.StatusCode)
+			}
+			next, rerr := ResolveURL(loc, cur)
+			if rerr != nil {
+				return nil, rerr
+			}
+			nu, perr := url.Parse(next)
+			if perr != nil {
+				return nil, ErrInvalidURL
+			}
+			if strings.ToLower(nu.Hostname()) != s.host {
+				return nil, fmt.Errorf("Redirect host not allowed: %s", nu.Hostname())
+			}
+			hops++
+			if hops > s.maxRedirects {
+				return nil, errors.New("Too many redirects")
+			}
+			cur = next
+			continue
+		}
+		data, rerr := readCappedBytes(res, s.maxBytes)
+		res.Body.Close()
+		if rerr != nil {
+			return nil, rerr
+		}
+		return data, nil
+	}
+}
+
 // ExternalText is External with a UTF-8 string body (nil body = GET).
 func (s *Site) ExternalText(rawURL string, body []byte, contentType string, extraHosts []string) (string, ExternalResult, error) {
 	res, err := s.External(rawURL, body, contentType, extraHosts)
@@ -851,6 +1307,164 @@ func (s *Site) ExternalText(rawURL string, body []byte, contentType string, extr
 }
 
 // === JSON / URL HELPERS (JS semantics) ===
+
+// TolerantJSON decodes a JSON document the way JSON.parse + the platform-style
+// leniency sites actually rely on behave: trailing commas, // and /* */
+// comments, and the non-standard NaN/±Infinity literals (which
+// JSON.stringify renders back as null). Numeric literals are preserved, so
+// integers round-trip exactly.
+func TolerantJSON(text string) (any, error) {
+	p := &jsonParseScanner{src: text}
+	if err := p.rewrite(); err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(strings.NewReader(p.out.String()))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+type jsonParseScanner struct {
+	src string
+	pos int
+	out strings.Builder
+}
+
+func (p *jsonParseScanner) errorf(format string, args ...any) error {
+	return fmt.Errorf("in JSON at position %d: %s", p.pos, fmt.Sprintf(format, args...))
+}
+
+func (p *jsonParseScanner) skipComment() {
+	if strings.HasPrefix(p.src[p.pos:], "//") {
+		p.pos += 2
+		for p.pos < len(p.src) && p.src[p.pos] != '\n' {
+			p.pos++
+		}
+		return
+	}
+	end := strings.Index(p.src[p.pos+2:], "*/")
+	if end < 0 {
+		p.pos = len(p.src)
+		return
+	}
+	p.pos += 2 + end + 2
+}
+
+func (p *jsonParseScanner) skipInsignificant() {
+	for p.pos < len(p.src) {
+		c := p.src[p.pos]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			p.pos++
+			continue
+		}
+		if c == '/' && p.pos+1 < len(p.src) && (p.src[p.pos+1] == '/' || p.src[p.pos+1] == '*') {
+			p.skipComment()
+			continue
+		}
+		return
+	}
+}
+
+func (p *jsonParseScanner) copyString() {
+	p.out.WriteByte('"')
+	p.pos++
+	for p.pos < len(p.src) {
+		c := p.src[p.pos]
+		if c == '\\' && p.pos+1 < len(p.src) {
+			p.out.WriteByte(c)
+			p.out.WriteByte(p.src[p.pos+1])
+			p.pos += 2
+			continue
+		}
+		p.out.WriteByte(c)
+		p.pos++
+		if c == '"' {
+			return
+		}
+	}
+}
+
+func (p *jsonParseScanner) copyNumber() {
+	for p.pos < len(p.src) {
+		c := p.src[p.pos]
+		if (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.' || c == 'e' || c == 'E' {
+			p.out.WriteByte(c)
+			p.pos++
+			continue
+		}
+		return
+	}
+}
+
+func (p *jsonParseScanner) readIdent() string {
+	start := p.pos
+	for p.pos < len(p.src) {
+		c := p.src[p.pos]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' {
+			p.pos++
+			continue
+		}
+		return p.src[start:p.pos]
+	}
+	return p.src[start:p.pos]
+}
+
+func isIdentStart(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$'
+}
+
+func (p *jsonParseScanner) rewrite() error {
+	for p.pos < len(p.src) {
+		c := p.src[p.pos]
+		switch {
+		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+			p.pos++
+		case c == '/' && p.pos+1 < len(p.src) && (p.src[p.pos+1] == '/' || p.src[p.pos+1] == '*'):
+			p.skipComment()
+		case c == ',':
+			p.pos++
+			p.skipInsignificant()
+			if p.pos < len(p.src) && (p.src[p.pos] == ']' || p.src[p.pos] == '}') {
+				continue // trailing comma
+			}
+			p.out.WriteByte(',')
+		case c == '"':
+			p.copyString()
+		case c == '-' || c == '+':
+			next := byte(0)
+			if p.pos+1 < len(p.src) {
+				next = p.src[p.pos+1]
+			}
+			if next == 'I' || next == 'N' {
+				p.pos++
+				if word := p.readIdent(); word == "Infinity" || word == "NaN" {
+					p.out.WriteString("null")
+					continue
+				}
+				return p.errorf("unexpected token")
+			}
+			p.copyNumber() // numbers first: exponents contain letters
+		case c >= '0' && c <= '9' || c == '.':
+			p.copyNumber()
+		case isIdentStart(c):
+			switch word := p.readIdent(); word {
+			case "true", "false", "null":
+				p.out.WriteString(word)
+			case "NaN", "Infinity", "undefined":
+				p.out.WriteString("null")
+			default:
+				return p.errorf("unexpected token")
+			}
+		default:
+			p.out.WriteByte(c)
+			p.pos++
+		}
+	}
+	return nil
+}
 
 // EncodeURIComponent mirrors JS encodeURIComponent.
 func EncodeURIComponent(s string) string {
@@ -962,7 +1576,25 @@ func numberString(f float64) string {
 	if abs >= 1e-6 && abs < 1e21 {
 		return strconv.FormatFloat(f, 'f', -1, 64)
 	}
-	return strconv.FormatFloat(f, 'e', -1, 64)
+	// ECMAScript writes exponents without zero padding: 1e-7, not 1e-07.
+	return normalizeExponent(strconv.FormatFloat(f, 'e', -1, 64))
+}
+
+func normalizeExponent(s string) string {
+	i := strings.IndexAny(s, "eE")
+	if i < 0 {
+		return s
+	}
+	mant, exp := s[:i], s[i+1:]
+	sign := ""
+	if len(exp) > 0 && (exp[0] == '+' || exp[0] == '-') {
+		sign, exp = exp[:1], exp[1:]
+	}
+	exp = strings.TrimLeft(exp, "0")
+	if exp == "" {
+		exp = "0"
+	}
+	return mant + "e" + sign + exp
 }
 
 func writeJSONString(sb *strings.Builder, s string) {
@@ -1064,18 +1696,18 @@ func Num(s string) string {
 	return strings.TrimSpace(nonNumRe.ReplaceAllString(s, ""))
 }
 
+// itoa keeps pagination paths readable.
+func itoa(n int) string { return strconv.Itoa(n) }
+
 // === JSON ===
 
-// DecodeAny decodes JSON preserving the original numeric literals (json.Number),
-// so integers round-trip exactly as JSON.parse → JSON.stringify does in TS.
+// DecodeAny decodes a JSON document, preserving the original numeric literals
+// (json.Number), so integers round-trip exactly as JSON.parse → JSON.stringify
+// does in TS. Parsing is as tolerant as JSON.parse plus the platform-era
+// leniency the scraped sites emit: trailing commas, // and /* */ comments and
+// the non-standard NaN/±Infinity literals.
 func DecodeAny(text string) (any, error) {
-	dec := json.NewDecoder(strings.NewReader(text))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return nil, err
-	}
-	return v, nil
+	return TolerantJSON(text)
 }
 
 // DecodeObject decodes a JSON object preserving numeric literals.
@@ -1099,4 +1731,9 @@ func GetStr(m map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// jsonNumber builds a json.Number for tests and internal literals.
+func jsonNumber[T int | int64](n T) json.Number {
+	return json.Number(strconv.FormatInt(int64(n), 10))
 }

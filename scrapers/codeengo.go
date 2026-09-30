@@ -44,12 +44,12 @@ var codeengoStyleNames = []string{"cyberpunk", "fantasy", "interior", "anime", "
 
 // codeengoStyles mirrors the STYLES record verbatim.
 var codeengoStyles = map[string]string{
-	"cyberpunk":  "A hyper-realistic cyber-enhanced hacker in a rain-soaked Tokyo alley, glowing magenta and cyan neon signs reflecting on wet asphalt, dense fog, holographic displays in windows, cinematic depth of field, SDXL-Lightning render, 8k resolution.",
-	"fantasy":    "Floating islands with waterfalls in a sunset sky, ghibli style",
-	"interior":   "Minimalist luxury living room with large glass windows overlooking forest",
-	"anime":      "cute anime girl with blue eyes",
-	"dragon":     "a majestic dragon over a snowy mountain, cinematic lighting, ultra-realistic",
-	"butterfly":  "Macro photography of a mechanical butterfly on a flower",
+	"cyberpunk": "A hyper-realistic cyber-enhanced hacker in a rain-soaked Tokyo alley, glowing magenta and cyan neon signs reflecting on wet asphalt, dense fog, holographic displays in windows, cinematic depth of field, SDXL-Lightning render, 8k resolution.",
+	"fantasy":   "Floating islands with waterfalls in a sunset sky, ghibli style",
+	"interior":  "Minimalist luxury living room with large glass windows overlooking forest",
+	"anime":     "cute anime girl with blue eyes",
+	"dragon":    "a majestic dragon over a snowy mountain, cinematic lighting, ultra-realistic",
+	"butterfly": "Macro photography of a mechanical butterfly on a flower",
 }
 
 // codeengoGenerateRaw POSTs the prompt and returns the decoded API payload.
@@ -100,7 +100,7 @@ func codeengoGenerate(prompt string) (map[string]any, error) {
 	}, nil
 }
 
-// decodeDataImage mirrors `Buffer.from(image.replace('data:image/png;base64,',''), 'base64')`,
+// decodeDataImage mirrors `Buffer.from(image.replace('data:image/png;base64,',”), 'base64')`,
 // including Node's lenient decoding (unknown characters are ignored).
 func decodeDataImage(image string) ([]byte, error) {
 	b64 := strings.Replace(image, "data:image/png;base64,", "", 1)
@@ -184,4 +184,3 @@ func codeengoScraper() Scraper {
 		},
 	}
 }
-

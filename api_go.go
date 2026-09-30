@@ -27,6 +27,9 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"sync"
+
+	"nontonanime/scrapers"
 	"strconv"
 	"strings"
 	"syscall"
@@ -258,25 +261,12 @@ func first(q map[string][]string, key string) string {
 var apiAdvKeys = []string{"sort", "status", "type", "score_min", "score_max", "year_min", "year_max", "genre", "rating", "mode", "studio", "season", "s", "page"}
 
 // === ROUTE HANDLERS ===
-// apiIndexPaths is derived in init() so hIndex does not reference apiRoutes during
-// package-variable initialization (which would form an initialization cycle).
-var apiIndexPaths []string
-
 func init() {
-	paths := make([]string, 0, len(apiRoutes)+1)
-	for _, rt := range apiRoutes {
-		if rt.Path != apiRootPath {
-			paths = append(paths, rt.Path)
-		}
-	}
-	paths = append(paths, apiOpenAPIPath) // served only with -spec; listed like the TS index
-	sort.Strings(paths)
-	apiIndexPaths = paths
 	apiCommandHook = handleAPICommand
 }
 
 func hIndex(s *apiServer, q map[string][]string) (apiResult, *apiFault) {
-	return apiResult{Data: IndexData{Name: apiName, UptimeS: apiUptimeSeconds(), Routes: apiIndexPaths}, TTL: ttlLong}, nil
+	return apiResult{Data: IndexData{Name: apiName, UptimeS: apiUptimeSeconds()}, TTL: ttlLong}, nil
 }
 
 func hHealth(s *apiServer, q map[string][]string) (apiResult, *apiFault) {
@@ -513,182 +503,184 @@ func urlParam(desc string) apiParam {
 var apiPageParam = apiParam{Name: "page", Desc: "1-based page (clamped 1..50)",
 	Schema: map[string]interface{}{"type": "integer", "minimum": 1, "maximum": 50, "default": 1}}
 
-var apiRoutes = []*apiRoute{
-	{
-		Path: apiRootPath, OperationID: "apiIndex", Tag: "system", TTL: ttlLong,
-		Summary:    "API index: name, uptime and the route list",
-		RespSchema: "IndexResponse", PayloadName: "IndexData", Payload: IndexData{},
-		Handler: hIndex,
-	},
-	{
-		Path: apiRootPath + "/health", OperationID: "health", Tag: "system", TTL: ttlNone,
-		Summary:    "Liveness probe (never cached)",
-		RespSchema: "HealthResponse", PayloadName: "HealthData", Payload: HealthData{},
-		Handler: hHealth,
-	},
-	{
-		Path: apiRootPath + "/home", OperationID: "getHome", Tag: "content", TTL: ttlShort,
-		Summary:    "Home page: latest episodes + per-section series grids",
-		Params:     []apiParam{apiPageParam},
-		RespSchema: "HomeResponse", PayloadName: "HomeContent", Payload: HomeContent{},
-		Handler: hHome,
-	},
-	{
-		Path: apiRootPath + "/latest", OperationID: "getLatest", Tag: "episodes", TTL: ttlShort,
-		Summary:    "Latest episodes grid",
-		Params:     []apiParam{apiPageParam},
-		RespSchema: "LatestResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
-		Handler: hLatest,
-	},
-	{
-		Path: apiRootPath + "/recent", OperationID: "getRecent", Tag: "episodes", TTL: ttlShort,
-		Summary:    "Recently updated episodes",
-		Params:     []apiParam{apiPageParam},
-		RespSchema: "RecentResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
-		Handler: hRecent,
-	},
-	{
-		Path: apiRootPath + "/list", OperationID: "getList", Tag: "catalog", TTL: ttlLong,
-		Summary:    "Full anime list",
-		Params:     []apiParam{apiPageParam},
-		RespSchema: "ListResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
-		Handler: hList,
-	},
-	{
-		Path: apiRootPath + "/search", OperationID: "search", Tag: "catalog", TTL: ttlShort,
-		Summary: "Keyword search",
-		Params: []apiParam{{Name: "q", Required: true, Desc: "Search query (min 2 chars)",
-			Schema: map[string]interface{}{"type": "string", "minLength": 2, "maxLength": 100}}},
-		RespSchema: "SearchResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
-		Handler: hSearch,
-	},
-	{
-		Path: apiRootPath + "/advsearch", OperationID: "advancedSearch", Tag: "catalog", TTL: ttlShort,
-		Summary:    "Advanced search with filters (values truncated to 64 chars)",
-		Params:     apiAdvSearchParams(),
-		RespSchema: "AdvSearchResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
-		Handler: hAdvSearch,
-	},
-	{
-		Path: apiRootPath + "/anime", OperationID: "getAnime", Tag: "content", TTL: ttlLong,
-		Summary:    "Anime detail by site URL (404 when unknown)",
-		Params:     []apiParam{urlParam("Absolute anime URL on the source site")},
-		RespSchema: "AnimeResponse", PayloadName: "AnimeDetail", Payload: (*AnimeDetail)(nil),
-		Handler: hAnime,
-	},
-	{
-		Path: apiRootPath + "/episode", OperationID: "getEpisode", Tag: "episodes", TTL: ttlShort,
-		Summary:    "Episode info: streams + downloads (404 when unknown)",
-		Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
-		RespSchema: "EpisodeResponse", PayloadName: "StreamResult", Payload: (*StreamResult)(nil),
-		Handler: hEpisode,
-	},
-	{
-		Path: apiRootPath + "/stream", OperationID: "getStream", Tag: "streaming", TTL: ttlNone,
-		Summary: "Resolved embed URL for one server (nonce-derived, never cached)",
-		Params: []apiParam{urlParam("Absolute episode URL on the source site"),
-			{Name: "server", Desc: "1-based server number (clamped 1..20)",
-				Schema: map[string]interface{}{"type": "integer", "minimum": 1, "maximum": 20, "default": 1}}},
-		RespSchema: "StreamResponse", PayloadName: "StreamUrl", Payload: "",
-		Handler: hStream,
-	},
-	{
-		Path: apiRootPath + "/resolve", OperationID: "resolveServer", Tag: "streaming", TTL: ttlNone,
-		Summary: "Resolve a server by number or name (nonce-derived, never cached)",
-		Params: []apiParam{urlParam("Absolute episode URL on the source site"),
-			{Name: "server", Desc: "Server number or name (default \"1\")",
-				Schema: map[string]interface{}{"type": "string", "maxLength": 64, "default": "1"}}},
-		RespSchema: "ResolveResponse", PayloadName: "StreamUrl", Payload: "",
-		Handler: hResolve,
-	},
-	{
-		Path: apiRootPath + "/servers", OperationID: "getServers", Tag: "streaming", TTL: ttlNone,
-		Summary:    "Server tabs + player nonce (nonce-bearing, never cached)",
-		Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
-		RespSchema: "ServersResponse", PayloadName: "ServersResult", Payload: ServersResult{},
-		Handler: hServers,
-	},
-	{
-		Path: apiRootPath + "/nav", OperationID: "getNav", Tag: "episodes", TTL: ttlShort,
-		Summary:    "Prev/all/next episode navigation",
-		Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
-		RespSchema: "NavResponse", PayloadName: "EpisodeNav", Payload: EpisodeNav{},
-		Handler: hNav,
-	},
-	{
-		Path: apiRootPath + "/meta", OperationID: "getMeta", Tag: "episodes", TTL: ttlLong,
-		Summary:    "Episode metadata (series, poster, genres)",
-		Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
-		RespSchema: "MetaResponse", PayloadName: "EpisodeMeta", Payload: EpisodeMeta{},
-		Handler: hMeta,
-	},
-	{
-		Path: apiRootPath + "/genres", OperationID: "getGenres", Tag: "catalog", TTL: ttlLong,
-		Summary: "Genre grid",
-		Params: []apiParam{{Name: "sort", Desc: "Optional sort mode",
-			Schema: map[string]interface{}{"type": "string", "enum": []string{"az", "popular", "ongoing"}}}},
-		RespSchema: "GenresResponse", PayloadName: "GenreList", Payload: []Genre(nil),
-		Handler: hGenres,
-	},
-	{
-		Path: apiRootPath + "/genre", OperationID: "getGenre", Tag: "catalog", TTL: ttlShort,
-		Summary: "Anime cards for one genre slug",
-		Params: []apiParam{{Name: "slug", Required: true, Desc: "Genre slug (a-z 0-9 -)",
-			Schema: map[string]interface{}{"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80}}, apiPageParam},
-		RespSchema: "GenreResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
-		Handler: hGenre,
-	},
-	{
-		Path: apiRootPath + "/ongoing", OperationID: "getOngoing", Tag: "catalog", TTL: ttlShort,
-		Summary: "Ongoing series (gacha grid)",
-		Params: []apiParam{{Name: "sort", Desc: "Optional sort value ([a-z0-9_], max 32)",
-			Schema: map[string]interface{}{"type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 32}}},
-		RespSchema: "OngoingResponse", PayloadName: "OngoingEntryList", Payload: []OngoingEntry(nil),
-		Handler: hOngoing,
-	},
-	{
-		Path: apiRootPath + "/popular", OperationID: "getPopular", Tag: "catalog", TTL: ttlLong,
-		Summary:    "Popular series (per-tab lists)",
-		RespSchema: "PopularResponse", PayloadName: "SeasonResultList", Payload: []SeasonResult(nil),
-		Handler: hPopular,
-	},
-	{
-		Path: apiRootPath + "/schedule", OperationID: "getSchedule", Tag: "catalog", TTL: ttlShort,
-		Summary:    "Weekly release schedule",
-		RespSchema: "ScheduleResponse", PayloadName: "ScheduleEntryList", Payload: []ScheduleEntry(nil),
-		Handler: hSchedule,
-	},
-	{
-		Path: apiRootPath + "/top", OperationID: "getTop", Tag: "catalog", TTL: ttlLong,
-		Summary:    "Top-rated anime",
-		RespSchema: "TopResponse", PayloadName: "TopAnimeList", Payload: []TopAnime(nil),
-		Handler: hTop,
-	},
-	{
-		Path: apiRootPath + "/season", OperationID: "getSeason", Tag: "catalog", TTL: ttlLong,
-		Summary: "Seasonal anime by season + year",
-		Params: []apiParam{
-			{Name: "season", Required: true, Desc: "Season name",
-				Schema: map[string]interface{}{"type": "string", "enum": []string{"spring", "summer", "fall", "autumn", "winter"}}},
-			{Name: "year", Required: true, Desc: "Year (clamped 1990..2100 by the scraper)",
-				Schema: map[string]interface{}{"type": "integer", "minimum": 1990, "maximum": 2100, "default": 2024}},
-			apiPageParam,
+func handwrittenRoutes() []*apiRoute {
+	return []*apiRoute{
+		{
+			Path: apiRootPath, OperationID: "apiIndex", Tag: "system", TTL: ttlLong,
+			Summary:    "API index: name, uptime and the route list",
+			RespSchema: "IndexResponse", PayloadName: "IndexData", Payload: IndexData{},
+			Handler: hIndex,
 		},
-		RespSchema: "SeasonResponse", PayloadName: "SeasonResultList", Payload: []SeasonResult(nil),
-		Handler: hSeason,
-	},
-	{
-		Path: apiRootPath + "/more", OperationID: "loadMore", Tag: "episodes", TTL: ttlNone,
-		Summary: "Load-more AJAX grid (nonce-derived, never cached)",
-		Params: []apiParam{
-			{Name: "offset", Desc: "Offset into the grid (clamped 0..100000)",
-				Schema: map[string]interface{}{"type": "integer", "minimum": 0, "maximum": 100000, "default": 0}},
-			{Name: "ids", Desc: "Comma-separated already-displayed post IDs (first 200 used)",
-				Schema: map[string]interface{}{"type": "string"}},
+		{
+			Path: apiRootPath + "/health", OperationID: "health", Tag: "system", TTL: ttlNone,
+			Summary:    "Liveness probe (never cached)",
+			RespSchema: "HealthResponse", PayloadName: "HealthData", Payload: HealthData{},
+			Handler: hHealth,
 		},
-		RespSchema: "MoreResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
-		Handler: hMore,
-	},
+		{
+			Path: apiRootPath + "/home", OperationID: "getHome", Tag: "content", TTL: ttlShort,
+			Summary:    "Home page: latest episodes + per-section series grids",
+			Params:     []apiParam{apiPageParam},
+			RespSchema: "HomeResponse", PayloadName: "HomeContent", Payload: HomeContent{},
+			Handler: hHome,
+		},
+		{
+			Path: apiRootPath + "/latest", OperationID: "getLatest", Tag: "episodes", TTL: ttlShort,
+			Summary:    "Latest episodes grid",
+			Params:     []apiParam{apiPageParam},
+			RespSchema: "LatestResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
+			Handler: hLatest,
+		},
+		{
+			Path: apiRootPath + "/recent", OperationID: "getRecent", Tag: "episodes", TTL: ttlShort,
+			Summary:    "Recently updated episodes",
+			Params:     []apiParam{apiPageParam},
+			RespSchema: "RecentResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
+			Handler: hRecent,
+		},
+		{
+			Path: apiRootPath + "/list", OperationID: "getList", Tag: "catalog", TTL: ttlLong,
+			Summary:    "Full anime list",
+			Params:     []apiParam{apiPageParam},
+			RespSchema: "ListResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
+			Handler: hList,
+		},
+		{
+			Path: apiRootPath + "/search", OperationID: "search", Tag: "catalog", TTL: ttlShort,
+			Summary: "Keyword search",
+			Params: []apiParam{{Name: "q", Required: true, Desc: "Search query (min 2 chars)",
+				Schema: map[string]interface{}{"type": "string", "minLength": 2, "maxLength": 100}}},
+			RespSchema: "SearchResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
+			Handler: hSearch,
+		},
+		{
+			Path: apiRootPath + "/advsearch", OperationID: "advancedSearch", Tag: "catalog", TTL: ttlShort,
+			Summary:    "Advanced search with filters (values truncated to 64 chars)",
+			Params:     apiAdvSearchParams(),
+			RespSchema: "AdvSearchResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
+			Handler: hAdvSearch,
+		},
+		{
+			Path: apiRootPath + "/anime", OperationID: "getAnime", Tag: "content", TTL: ttlLong,
+			Summary:    "Anime detail by site URL (404 when unknown)",
+			Params:     []apiParam{urlParam("Absolute anime URL on the source site")},
+			RespSchema: "AnimeResponse", PayloadName: "AnimeDetail", Payload: (*AnimeDetail)(nil),
+			Handler: hAnime,
+		},
+		{
+			Path: apiRootPath + "/episode", OperationID: "getEpisode", Tag: "episodes", TTL: ttlShort,
+			Summary:    "Episode info: streams + downloads (404 when unknown)",
+			Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
+			RespSchema: "EpisodeResponse", PayloadName: "StreamResult", Payload: (*StreamResult)(nil),
+			Handler: hEpisode,
+		},
+		{
+			Path: apiRootPath + "/stream", OperationID: "getStream", Tag: "streaming", TTL: ttlNone,
+			Summary: "Resolved embed URL for one server (nonce-derived, never cached)",
+			Params: []apiParam{urlParam("Absolute episode URL on the source site"),
+				{Name: "server", Desc: "1-based server number (clamped 1..20)",
+					Schema: map[string]interface{}{"type": "integer", "minimum": 1, "maximum": 20, "default": 1}}},
+			RespSchema: "StreamResponse", PayloadName: "StreamUrl", Payload: "",
+			Handler: hStream,
+		},
+		{
+			Path: apiRootPath + "/resolve", OperationID: "resolveServer", Tag: "streaming", TTL: ttlNone,
+			Summary: "Resolve a server by number or name (nonce-derived, never cached)",
+			Params: []apiParam{urlParam("Absolute episode URL on the source site"),
+				{Name: "server", Desc: "Server number or name (default \"1\")",
+					Schema: map[string]interface{}{"type": "string", "maxLength": 64, "default": "1"}}},
+			RespSchema: "ResolveResponse", PayloadName: "StreamUrl", Payload: "",
+			Handler: hResolve,
+		},
+		{
+			Path: apiRootPath + "/servers", OperationID: "getServers", Tag: "streaming", TTL: ttlNone,
+			Summary:    "Server tabs + player nonce (nonce-bearing, never cached)",
+			Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
+			RespSchema: "ServersResponse", PayloadName: "ServersResult", Payload: ServersResult{},
+			Handler: hServers,
+		},
+		{
+			Path: apiRootPath + "/nav", OperationID: "getNav", Tag: "episodes", TTL: ttlShort,
+			Summary:    "Prev/all/next episode navigation",
+			Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
+			RespSchema: "NavResponse", PayloadName: "EpisodeNav", Payload: EpisodeNav{},
+			Handler: hNav,
+		},
+		{
+			Path: apiRootPath + "/meta", OperationID: "getMeta", Tag: "episodes", TTL: ttlLong,
+			Summary:    "Episode metadata (series, poster, genres)",
+			Params:     []apiParam{urlParam("Absolute episode URL on the source site")},
+			RespSchema: "MetaResponse", PayloadName: "EpisodeMeta", Payload: EpisodeMeta{},
+			Handler: hMeta,
+		},
+		{
+			Path: apiRootPath + "/genres", OperationID: "getGenres", Tag: "catalog", TTL: ttlLong,
+			Summary: "Genre grid",
+			Params: []apiParam{{Name: "sort", Desc: "Optional sort mode",
+				Schema: map[string]interface{}{"type": "string", "enum": []string{"az", "popular", "ongoing"}}}},
+			RespSchema: "GenresResponse", PayloadName: "GenreList", Payload: []Genre(nil),
+			Handler: hGenres,
+		},
+		{
+			Path: apiRootPath + "/genre", OperationID: "getGenre", Tag: "catalog", TTL: ttlShort,
+			Summary: "Anime cards for one genre slug",
+			Params: []apiParam{{Name: "slug", Required: true, Desc: "Genre slug (a-z 0-9 -)",
+				Schema: map[string]interface{}{"type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80}}, apiPageParam},
+			RespSchema: "GenreResponse", PayloadName: "AnimeCardList", Payload: []AnimeCard(nil),
+			Handler: hGenre,
+		},
+		{
+			Path: apiRootPath + "/ongoing", OperationID: "getOngoing", Tag: "catalog", TTL: ttlShort,
+			Summary: "Ongoing series (gacha grid)",
+			Params: []apiParam{{Name: "sort", Desc: "Optional sort value ([a-z0-9_], max 32)",
+				Schema: map[string]interface{}{"type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 32}}},
+			RespSchema: "OngoingResponse", PayloadName: "OngoingEntryList", Payload: []OngoingEntry(nil),
+			Handler: hOngoing,
+		},
+		{
+			Path: apiRootPath + "/popular", OperationID: "getPopular", Tag: "catalog", TTL: ttlLong,
+			Summary:    "Popular series (per-tab lists)",
+			RespSchema: "PopularResponse", PayloadName: "SeasonResultList", Payload: []SeasonResult(nil),
+			Handler: hPopular,
+		},
+		{
+			Path: apiRootPath + "/schedule", OperationID: "getSchedule", Tag: "catalog", TTL: ttlShort,
+			Summary:    "Weekly release schedule",
+			RespSchema: "ScheduleResponse", PayloadName: "ScheduleEntryList", Payload: []ScheduleEntry(nil),
+			Handler: hSchedule,
+		},
+		{
+			Path: apiRootPath + "/top", OperationID: "getTop", Tag: "catalog", TTL: ttlLong,
+			Summary:    "Top-rated anime",
+			RespSchema: "TopResponse", PayloadName: "TopAnimeList", Payload: []TopAnime(nil),
+			Handler: hTop,
+		},
+		{
+			Path: apiRootPath + "/season", OperationID: "getSeason", Tag: "catalog", TTL: ttlLong,
+			Summary: "Seasonal anime by season + year",
+			Params: []apiParam{
+				{Name: "season", Required: true, Desc: "Season name",
+					Schema: map[string]interface{}{"type": "string", "enum": []string{"spring", "summer", "fall", "autumn", "winter"}}},
+				{Name: "year", Required: true, Desc: "Year (clamped 1990..2100 by the scraper)",
+					Schema: map[string]interface{}{"type": "integer", "minimum": 1990, "maximum": 2100, "default": 2024}},
+				apiPageParam,
+			},
+			RespSchema: "SeasonResponse", PayloadName: "SeasonResultList", Payload: []SeasonResult(nil),
+			Handler: hSeason,
+		},
+		{
+			Path: apiRootPath + "/more", OperationID: "loadMore", Tag: "episodes", TTL: ttlNone,
+			Summary: "Load-more AJAX grid (nonce-derived, never cached)",
+			Params: []apiParam{
+				{Name: "offset", Desc: "Offset into the grid (clamped 0..100000)",
+					Schema: map[string]interface{}{"type": "integer", "minimum": 0, "maximum": 100000, "default": 0}},
+				{Name: "ids", Desc: "Comma-separated already-displayed post IDs (first 200 used)",
+					Schema: map[string]interface{}{"type": "string"}},
+			},
+			RespSchema: "MoreResponse", PayloadName: "EpisodeList", Payload: []Episode(nil),
+			Handler: hMore,
+		},
+	}
 }
 
 func apiAdvSearchParams() []apiParam {
@@ -712,8 +704,9 @@ func apiAdvSearchParams() []apiParam {
 }
 
 var apiRouteIdx = func() map[string]*apiRoute {
-	m := make(map[string]*apiRoute, len(apiRoutes))
-	for _, rt := range apiRoutes {
+	rs := apiRoutes()
+	m := make(map[string]*apiRoute, len(rs))
+	for _, rt := range rs {
 		m[rt.Path] = rt
 	}
 	return m
@@ -1250,7 +1243,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 	}
 
 	// payload schemas, derived from the same Go types the handlers return
-	for _, rt := range apiRoutes {
+	for _, rt := range apiRoutes() {
 		t := reflect.TypeOf(rt.Payload)
 		for t != nil && t.Kind() == reflect.Ptr {
 			t = t.Elem()
@@ -1277,7 +1270,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 
 	paths := map[string]interface{}{}
 
-	for _, rt := range apiRoutes {
+	for _, rt := range apiRoutes() {
 		payloadSchema := rt.PayloadName
 		respSchemaName := rt.RespSchema
 		envelope := envelopeFor(payloadSchema)
@@ -1413,4 +1406,96 @@ func cacheControlDescription(ttl int) string {
 		return "nonce-derived route — always `no-store`"
 	}
 	return fmt.Sprintf("`public, max-age=%d, s-maxage=%d, stale-while-revalidate=%d`", ttl, ttl*2, ttl*4)
+}
+
+// === SCRAPER-BACKED ROUTES ===
+// One route per command of every scraper ported into package scrapers:
+// /api/v1/<scraper>/<command>. Positional args come from repeatable ?args=…,
+// flags from their own query keys, so CLI and HTTP cannot drift apart.
+func hScraperCommand(name string, cmd scrapers.Command) apiHandler {
+	return func(_ *apiServer, q map[string][]string) (apiResult, *apiFault) {
+		var args []string
+		for _, a := range q["args"] {
+			if a != "" {
+				args = append(args, a)
+			}
+		}
+		flags := map[string]string{}
+		for k, vs := range q {
+			if k == "args" || len(vs) == 0 || vs[0] == "" {
+				continue
+			}
+			flags[k] = vs[0]
+		}
+		out, err := cmd.Run(args, flags)
+		ttl := ttlShort
+		switch name {
+		case "detail", "info", "track", "album", "artist", "sections", "list", "genrelist", "supported":
+			ttl = ttlLong
+		}
+		return apiWrap(out, err, ttl)
+	}
+}
+
+func scraperRoutes() []*apiRoute {
+	var out []*apiRoute
+	for _, sc := range scrapers.All() {
+		names := make([]string, 0, len(sc.Commands))
+		for n := range sc.Commands {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, n := range names {
+			cmd := sc.Commands[n]
+			params := []apiParam{{
+				Name: "args", Desc: "positional arguments (?args=value, repeatable)",
+				Schema: map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+			}}
+			for fname, kind := range cmd.Flags {
+				if kind == "value" {
+					params = append(params, apiParam{Name: fname, Desc: "flag --" + fname,
+						Schema: map[string]interface{}{"type": "string"}})
+				}
+			}
+			summary := cmd.Desc
+			if summary == "" {
+				summary = sc.Title + " " + n
+			}
+			out = append(out, &apiRoute{
+				Path:        apiRootPath + "/" + sc.Name + "/" + n,
+				OperationID: sc.Name + "_" + n,
+				Summary:     summary,
+				Tag:         sc.Name,
+				TTL:         ttlShort,
+				Params:      params,
+				RespSchema:  "GenericResponse",
+				PayloadName: "GenericData",
+				Payload:     map[string]interface{}{},
+				Handler:     hScraperCommand(n, cmd),
+			})
+		}
+	}
+	return out
+}
+
+// apiRoutes is the single source of truth for serving and OpenAPI: the
+// handwritten anime routes plus one route per command of every ported scraper.
+// Lazy because scrapers.All() depends on other packages' init functions.
+var apiRoutes = sync.OnceValue(func() []*apiRoute {
+	return append(handwrittenRoutes(), scraperRoutes()...)
+})
+
+// apiIndexPaths is the route list advertised by the index handler (lazy: it
+// reads apiRoutes, so it cannot be a package-initialised value).
+func apiIndexPaths() []string {
+	rs := apiRoutes()
+	paths := make([]string, 0, len(rs)+1)
+	for _, rt := range rs {
+		if rt.Path != apiRootPath {
+			paths = append(paths, rt.Path)
+		}
+	}
+	paths = append(paths, apiOpenAPIPath) // served only with -spec; listed like the TS index
+	sort.Strings(paths)
+	return paths
 }
