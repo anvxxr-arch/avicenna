@@ -1,0 +1,18 @@
+{
+  "scraper": "samehadaku",
+  "capturedAt": "2026-09-30T06:27:17.647Z",
+  "cases": [
+    {
+      "args": [
+        "help"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "kind",
+          "value": "string"
+        }
+      ]
+    }
+  ]
+}

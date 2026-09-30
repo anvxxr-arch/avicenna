@@ -1,0 +1,628 @@
+// samehadaku.go — Go port of samehadaku.ts (Samehadaku, v2.samehadaku.how).
+//
+// The site runs the WordPress "eastplay" theme behind a Cloudflare managed
+// challenge, so plain HTTP clients get "Just a moment..." (HTTP 403) — the same
+// situation as lk21. Parsers are therefore kept structurally identical to the
+// reference and verified against captured real markup; with a challenge-solving
+// session's cookie in SAMEHADAKU_COOKIE every command runs live.
+//
+// Endpoints
+//
+//	home     [page]           latest anime cards + latest-episode feed
+//	search   <query>          /?s=<query>
+//	list     [page]           /anime-terbaru/ paginated catalogue
+//	detail   <slug|url>       info, genres, rating, episode list, batch links
+//	episode  <slug|url>       mirrors (AJAX), downloads, navigation
+//	batch    <slug|url>       batch download groups
+//	mirrors  <slug|url> [n]   player_ajax mirror embeds only
+package scrapers
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+)
+
+// shBase is overridable so the parsers can be exercised against a local fixture
+// host (the live site is challenge-gated for plain HTTP clients).
+var shBase = strings.TrimRight(func() string {
+	if b := os.Getenv("SAMEHADAKU_BASE"); b != "" {
+		return b
+	}
+	return "https://v2.samehadaku.how"
+}(), "/")
+
+var shSite = NewSite(SiteConfig{
+	Base:   shBase,
+	RateMS: 450,
+	Headers: map[string]string{
+		"user-agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+		"accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+		"accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+	},
+})
+
+func init() {
+	if c := os.Getenv("SAMEHADAKU_COOKIE"); c != "" {
+		shSite.SetCookie(shHostOf(shBase), c)
+	}
+}
+
+func shHostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "v2.samehadaku.how"
+	}
+	return u.Host
+}
+
+// shFetch GETs an origin-pinned page and trims the UTF-8 BOM.
+func shFetch(rawURL string) (string, error) {
+	res, err := shSite.Do(RequestSpec{Method: http.MethodGet, URL: rawURL, Follow: true})
+	if err != nil {
+		return "", err
+	}
+	if res.Status < 200 || res.Status >= 300 {
+		return "", fmt.Errorf("HTTP %d for %s", res.Status, rawURL)
+	}
+	return strings.TrimPrefix(res.BodyString(), "\uFEFF"), nil
+}
+
+// shSlug mirrors slugOf(): the last non-empty path segment.
+func shSlug(raw string) string {
+	s := raw
+	if i := strings.IndexAny(s, "?#"); i != -1 {
+		s = s[:i]
+	}
+	s = strings.TrimRight(s, "/")
+	parts := strings.Split(s, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] != "" {
+			return parts[i]
+		}
+	}
+	return ""
+}
+
+// shAbs absolutises a site-relative href.
+func shAbs(href string) string {
+	if href == "" {
+		return ""
+	}
+	if strings.HasPrefix(href, "http") {
+		return href
+	}
+	if strings.HasPrefix(href, "/") {
+		return shBase + href
+	}
+	return shBase + "/" + href
+}
+
+// shPageTitle strips the trailing site suffix from <title>.
+var shTitleSuffixRe = regexp.MustCompile(`(?i)\s*[–|-]\s*Samehadaku\s*$`)
+
+func shPageTitle(doc *goquery.Document) string {
+	return Txt(shTitleSuffixRe.ReplaceAllString(doc.Find("title").First().Text(), ""), 200)
+}
+
+// shPostShowCard parses one `div.post-show li` card.
+func shPostShowCard(sel *goquery.Selection) map[string]any {
+	a := sel.Find("h2.entry-title a").First()
+	href, ok := a.Attr("href")
+	if !ok || href == "" {
+		return nil
+	}
+	abs := shAbs(href)
+	out := map[string]any{
+		"title": Txt(a.Text(), 200),
+		"slug":  strings.TrimSuffix(strings.Replace(abs, shBase+"/anime/", "", 1), "/"),
+		"url":   abs,
+	}
+	if poster, ok := sel.Find("img").First().Attr("src"); ok && poster != "" {
+		out["poster"] = poster
+	} else {
+		out["poster"] = nil
+	}
+	if ep := Txt(sel.Find(`author[itemprop="name"]`).First().Text(), 40); ep != "" {
+		out["episode"] = ep
+	}
+	if by := Txt(sel.Find("span.author").First().Text(), 60); by != "" {
+		out["postedBy"] = by
+	}
+	var released string
+	sel.Find("span").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		t := s.Text()
+		if !strings.Contains(strings.ToLower(t), "released on") {
+			return true
+		}
+		released = Txt(regexp.MustCompile(`(?is).*Released on:\s*`).ReplaceAllString(t, ""), 60)
+		return false
+	})
+	if released != "" {
+		out["releasedOn"] = released
+	}
+	return out
+}
+
+// shAnimpostCard parses one `article.animpost` (search result) card.
+func shAnimpostCard(sel *goquery.Selection) map[string]any {
+	a := sel.Find(`a[href*="/anime/"]`).First()
+	href, ok := a.Attr("href")
+	if !ok || href == "" {
+		return nil
+	}
+	abs := shAbs(href)
+	title, _ := a.Attr("title")
+	if title == "" {
+		title = a.Text()
+	}
+	out := map[string]any{
+		"title":  Txt(title, 200),
+		"slug":   strings.TrimSuffix(strings.Replace(abs, shBase+"/anime/", "", 1), "/"),
+		"url":    abs,
+		"poster": nilOrStr(sel.Find("img.anmsa").First().AttrOr("src", "")),
+		"type":   nilOrStr(Txt(sel.Find(".content-thumb .type").First().Text(), 30)),
+		"score":  nilOrStr(Txt(Num(sel.Find(".content-thumb .score").First().Text()), 12)),
+		"status": nilOrStr(Txt(sel.Find(".data .type").First().Text(), 30)),
+	}
+	var views string
+	sel.Find(".metadata span").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		t := s.Text()
+		if !strings.Contains(strings.ToLower(t), "views") {
+			return true
+		}
+		views = Txt(regexp.MustCompile(`(?is)\s*Views.*`).ReplaceAllString(t, ""), 20)
+		return false
+	})
+	if views != "" {
+		out["views"] = views
+	} else {
+		out["views"] = nil
+	}
+	genres := []any{}
+	sel.Find(".genres .mta a").Each(func(_ int, g *goquery.Selection) {
+		if t := Txt(g.Text(), 40); t != "" {
+			genres = append(genres, t)
+		}
+	})
+	if len(genres) > 0 {
+		out["genres"] = genres
+	}
+	return out
+}
+
+// nilOrStr maps a possibly-empty string (or a two-value Attr result) to
+// either the string or an explicit null, matching the reference's `x || null`.
+func nilOrStr(v any) any {
+	switch t := v.(type) {
+	case string:
+		if t == "" {
+			return nil
+		}
+		return t
+	case []any:
+		return nil
+	}
+	return nil
+}
+
+// === COMMANDS ===
+// shClampPage mirrors the reference's Math.min(50, Math.max(1, page || 1)).
+func shClampPage(p int) int {
+	if p < 1 {
+		return 1
+	}
+	if p > 50 {
+		return 50
+	}
+	return p
+}
+
+// shSearch mirrors search().
+func shSearch(query string) (map[string]any, error) {
+	q := Txt(query, 100)
+	if n16(q) < 2 {
+		return nil, errors.New("Query too short")
+	}
+	// encodeURIComponent semantics: spaces become %20, not "+".
+	pageURL := shBase + "/?s=" + strings.ReplaceAll(url.QueryEscape(q), "+", "%20")
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	results := []any{}
+	doc.Find("article.animpost").Each(func(_ int, el *goquery.Selection) {
+		if c := shAnimpostCard(el); c != nil {
+			results = append(results, c)
+		}
+	})
+	if len(results) == 0 {
+		doc.Find("div.post-show li").Each(func(_ int, el *goquery.Selection) {
+			if c := shPostShowCard(el); c != nil {
+				results = append(results, c)
+			}
+		})
+	}
+	return map[string]any{"query": q, "url": pageURL, "count": len(results), "results": results}, nil
+}
+
+// shDoc fetches a page and parses it; transport failures propagate.
+func shDoc(rawURL string) (*goquery.Document, error) {
+	html, err := shFetch(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return SafeDoc(html), nil
+}
+
+// shHome mirrors home().
+func shHome(page int) (map[string]any, error) {
+	p := shClampPage(page)
+	pageURL := shBase + "/"
+	if p != 1 {
+		pageURL = fmt.Sprintf("%s/page/%d/", shBase, p)
+	}
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	cards := []any{}
+	doc.Find("div.post-show li").Each(func(_ int, el *goquery.Selection) {
+		if c := shPostShowCard(el); c != nil {
+			cards = append(cards, c)
+		}
+	})
+	latest := []any{}
+	doc.Find("div.widget_senction li, .widget_senction .lstepsiode li").Each(func(_ int, el *goquery.Selection) {
+		href, ok := el.Find(`a[href*="episode"], a[href*="/anime/"]`).First().Attr("href")
+		if !ok || !strings.Contains(strings.ToLower(href), "episode") {
+			return
+		}
+		latest = append(latest, map[string]any{
+			"title":   Txt(el.Find(".lchx a, .entry-title a, a").First().Text(), 160),
+			"url":     shAbs(href),
+			"episode": nilOrStr(Txt(el.Find(".eps a").First().Text(), 12)),
+			"date":    nilOrStr(Txt(el.Find(".date").First().Text(), 40)),
+		})
+	})
+	if len(latest) > 20 {
+		latest = latest[:20]
+	}
+	return map[string]any{
+		"creator": "avicenna", "page": p, "url": pageURL,
+		"count": len(cards), "cards": cards, "latestEpisode": latest,
+	}, nil
+}
+
+// shList mirrors list().
+func shList(page int) (map[string]any, error) {
+	p := shClampPage(page)
+	pageURL := shBase + "/anime-terbaru/"
+	if p != 1 {
+		pageURL = fmt.Sprintf("%s/anime-terbaru/page/%d/", shBase, p)
+	}
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	items := []any{}
+	doc.Find("div.post-show li").Each(func(_ int, el *goquery.Selection) {
+		if c := shPostShowCard(el); c != nil {
+			items = append(items, c)
+		}
+	})
+	var total any
+	if m := regexp.MustCompile(`(?i)of\s+(\d+)`).FindStringSubmatch(Txt(doc.Find(".pagination span").First().Text(), 40)); m != nil {
+		total = atoiSafe(m[1])
+	}
+	return map[string]any{
+		"creator": "avicenna", "url": pageURL, "page": p,
+		"totalPages": total, "count": len(items), "items": items,
+	}, nil
+}
+
+// shDetail mirrors detail().
+func shDetail(rawSlug string) (map[string]any, error) {
+	slug := shSlug(rawSlug)
+	if slug == "" {
+		return nil, errors.New("Slug required")
+	}
+	if !shSlugRe.MatchString(slug) {
+		return nil, errors.New("Invalid slug (a-z 0-9 - only)")
+	}
+	pageURL := fmt.Sprintf("%s/anime/%s/", shBase, slug)
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	info := doc.Find(".infoanime")
+	title := Txt(info.Find("h2.entry-title, h1.entry-title").First().Text(), 200)
+	if title == "" {
+		title = shPageTitle(doc)
+	}
+	rating := nilOrStr(Txt(info.Find(`[itemprop="ratingValue"]`).First().Text(), 12))
+	sinopsis := Txt(doc.Find(".infoanime .desc, .infoanime .entry-content, .desc p").First().Text(), 1200)
+	details := map[string]any{}
+	info.Find(".spe span").Each(func(_ int, s *goquery.Selection) {
+		raw := Txt(s.Text(), 200)
+		if i := strings.Index(raw, ":"); i > 0 {
+			details[Txt(raw[:i], 40)] = Txt(raw[i+1:], 200)
+		}
+	})
+	genres := []any{}
+	doc.Find(".genre-info a, .infoanime .genre-info a").Each(func(_ int, g *goquery.Selection) {
+		if t := Txt(g.Text(), 40); t != "" {
+			genres = append(genres, t)
+		}
+	})
+	episodes := []any{}
+	doc.Find(".lstepsiode.listeps li").Each(func(_ int, el *goquery.Selection) {
+		a := el.Find(".lchx a, a").First()
+		href, ok := a.Attr("href")
+		if !ok || href == "" {
+			return
+		}
+		episodes = append(episodes, map[string]any{
+			"episode": nilOrStr(Txt(el.Find(".eps a").First().Text(), 12)),
+			"title":   Txt(a.Text(), 160),
+			"url":     shAbs(href),
+			"date":    nilOrStr(Txt(el.Find(".date").First().Text(), 40)),
+		})
+	})
+	batches := []any{}
+	doc.Find(".listbatch a").Each(func(_ int, a *goquery.Selection) {
+		if href, ok := a.Attr("href"); ok && href != "" {
+			batches = append(batches, map[string]any{"title": Txt(a.Text(), 160), "url": shAbs(href)})
+		}
+	})
+	out := map[string]any{
+		"creator": "avicenna", "url": pageURL, "slug": slug, "title": title,
+		"poster":   nilOrStr(info.Find("img.anmsa, .thumb img").First().AttrOr("src", "")),
+		"rating":   rating,
+		"genres":   genres,
+		"details":  details,
+		"episodes": episodes, "episodeCount": len(episodes),
+	}
+	if sinopsis != "" {
+		out["sinopsis"] = sinopsis
+	}
+	if len(batches) > 0 {
+		out["batches"] = batches
+	}
+	return out, nil
+}
+
+// shPlayerOptions reads the `.east_player_option` mirror list off a page.
+// includeType matches the reference: `mirrors` emits data-type, `episode` does not.
+func shPlayerOptions(doc *goquery.Document, includeType bool) []any {
+	options := []any{}
+	doc.Find("#server .east_player_option, .east_player_option").Each(func(_ int, el *goquery.Selection) {
+		o := map[string]any{
+			"nume": atoiSafe(el.AttrOr("data-nume", "0")),
+			"name": Txt(el.Find("span").First().Text(), 60),
+			"post": nilOrStr(el.AttrOr("data-post", "")),
+		}
+		if includeType {
+			o["type"] = nilOrStr(el.AttrOr("data-type", ""))
+		}
+		options = append(options, o)
+	})
+	return options
+}
+
+// shMirrors mirrors mirrors().
+func shMirrors(rawSlug string, nume int) (map[string]any, error) {
+	slug := shSlug(rawSlug)
+	if slug == "" {
+		return nil, errors.New("Slug required")
+	}
+	doc, err := shDoc(fmt.Sprintf("%s/%s/", shBase, slug))
+	if err != nil {
+		return nil, err
+	}
+	options := shPlayerOptions(doc, true)
+	if len(options) == 0 {
+		return nil, errors.New("No player options on this page")
+	}
+	post, _ := options[0].(map[string]any)["post"].(string)
+	if post == "" {
+		return nil, errors.New("No player options on this page")
+	}
+	if nume < 1 {
+		nume = 1
+	}
+	body := fmt.Sprintf("action=player_ajax&post=%s&nume=%d&type=schtml", url.QueryEscape(post), nume)
+	raw, err := shSite.PostForm("/wp-admin/admin-ajax.php", body, "")
+	if err != nil {
+		return nil, err
+	}
+	var server any
+	for _, o := range options {
+		if m, ok := o.(map[string]any); ok && m["nume"] == nume {
+			server = m["name"]
+			break
+		}
+	}
+	return map[string]any{
+		"slug": slug, "post": post, "nume": nume, "server": server,
+		"options": options, "embed": strings.TrimSpace(raw),
+	}, nil
+}
+
+// shDownloadGroups reads `<div id="downloadb"><p><b>label</b></p><ul><li><strong>quality</strong><span><a>…`
+func shDownloadGroups(doc *goquery.Document) []any {
+	groups := []any{}
+	doc.Find("#downloadb").Each(func(_ int, block *goquery.Selection) {
+		label := Txt(block.ChildrenFiltered("p, h4, h3").First().Text(), 80)
+		entries := []any{}
+		var current map[string]any
+		block.Find("ul li").Each(func(_ int, li *goquery.Selection) {
+			quality := Txt(li.Find("strong").First().Text(), 24)
+			if current == nil || current["quality"] != quality {
+				current = map[string]any{"quality": quality, "servers": []any{}}
+				entries = append(entries, current)
+			}
+			li.Find("a").Each(func(_ int, a *goquery.Selection) {
+				if href, ok := a.Attr("href"); ok && href != "" {
+					current["servers"] = append(current["servers"].([]any),
+						map[string]any{"name": Txt(a.Text(), 40), "url": href})
+				}
+			})
+		})
+		if len(entries) > 0 {
+			groups = append(groups, map[string]any{"label": label, "entries": entries})
+		}
+	})
+	return groups
+}
+
+// shEpisode mirrors episode().
+func shEpisode(rawSlug string) (map[string]any, error) {
+	slug := shSlug(rawSlug)
+	if slug == "" {
+		return nil, errors.New("Slug required")
+	}
+	pageURL := fmt.Sprintf("%s/%s/", shBase, slug)
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	players := shPlayerOptions(doc, false)
+	downloads := shDownloadGroups(doc)
+
+	// .naveps = [prev] [All Episode] [next]; `nonex` marks a missing neighbour.
+	navNodes := doc.Find(".naveps .nvs")
+	prevHref, _ := navNodes.First().Find("a").Attr("href")
+	lastA := navNodes.Last().Find("a")
+	nextHref, _ := lastA.Attr("href")
+	hasNext := lastA.Length() > 0 && !lastA.HasClass("nonex") && nextHref != "" && nextHref != "#"
+
+	title := Txt(doc.Find("h1.entry-title").First().Text(), 200)
+	if title == "" {
+		title = shPageTitle(doc)
+	}
+	var anime any
+	doc.Find(".naveps a").EachWithBreak(func(_ int, a *goquery.Selection) bool {
+		href, _ := a.Attr("href")
+		if !strings.Contains(href, "/anime/") {
+			return true
+		}
+		anime = map[string]any{"title": Txt(a.Text(), 160), "slug": shSlug(shAbs(href)), "url": shAbs(href)}
+		return false
+	})
+	var prev, next any
+	if prevHref != "" {
+		prev = map[string]any{"slug": shSlug(prevHref), "url": shAbs(prevHref)}
+	}
+	if hasNext {
+		next = map[string]any{"slug": shSlug(nextHref), "url": shAbs(nextHref)}
+	}
+	embed, _ := doc.Find(`#player_embed iframe, #player iframe, iframe[src*="blogger"], iframe[src*="youtube"]`).First().Attr("src")
+
+	return map[string]any{
+		"creator": "avicenna", "url": pageURL, "slug": slug, "title": title,
+		"anime": anime, "players": players, "downloads": downloads,
+		"prev": prev, "next": next, "embed": nilOrStr(embed),
+	}, nil
+}
+
+// shBatch mirrors batch().
+func shBatch(rawSlug string) (map[string]any, error) {
+	slug := shSlug(rawSlug)
+	if slug == "" {
+		return nil, errors.New("Slug required")
+	}
+	pageURL := fmt.Sprintf("%s/batch/%s/", shBase, slug)
+	doc, err := shDoc(pageURL)
+	if err != nil {
+		return nil, err
+	}
+	groups := shDownloadGroups(doc)
+	title := Txt(doc.Find("h1.entry-title").First().Text(), 200)
+	if title == "" {
+		title = shPageTitle(doc)
+	}
+	return map[string]any{
+		"creator": "avicenna", "url": pageURL, "slug": slug, "title": title,
+		"poster": nilOrStr(doc.Find(".thumb-batch img, .content-batch img").First().AttrOr("src", "")),
+		"count":  len(groups), "groups": groups,
+	}, nil
+}
+
+var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)
+
+// shAtoi is JS parseInt for the small numeric fields this site emits.
+func atoiSafe(s string) int {
+	n := 0
+	for i := range s {
+		if s[i] < '0' || s[i] > '9' {
+			break
+		}
+		n = n*10 + int(s[i]-'0')
+	}
+	return n
+}
+
+// samehadakuScraper builds the CLI surface (identical to the TS reference).
+func samehadakuScraper() Scraper {
+	return Scraper{
+		Name:  "samehadaku",
+		Title: "Samehadaku Scraper (v2.samehadaku.how)",
+		Commands: map[string]Command{
+			"home": {
+				Name: "home", Desc: "Latest anime cards + latest-episode feed", Usage: "[page]",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shHome(atoiSafe(argAt(args, 0)))
+				},
+			},
+			"search": {
+				Name: "search", Desc: "Search anime by title", Usage: "<query>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shSearch(strings.Join(args, " "))
+				},
+			},
+			"list": {
+				Name: "list", Desc: "Paginated anime catalogue (/anime-terbaru/)", Usage: "[page]",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shList(atoiSafe(argAt(args, 0)))
+				},
+			},
+			"detail": {
+				Name: "detail", Desc: "Anime detail: info, genres, rating, episodes, batch links", Usage: "<slug|url>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shDetail(argAt(args, 0))
+				},
+			},
+			"episode": {
+				Name: "episode", Desc: "Episode page: mirrors, downloads, navigation", Usage: "<slug|url>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shEpisode(argAt(args, 0))
+				},
+			},
+			"batch": {
+				Name: "batch", Desc: "Batch download groups", Usage: "<slug|url>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shBatch(argAt(args, 0))
+				},
+			},
+			"mirrors": {
+				Name: "mirrors", Desc: "Resolve player mirrors via the player_ajax endpoint", Usage: "<slug|url> [nume]",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					n := atoiSafe(argAt(args, 1))
+					if n == 0 {
+						n = 1
+					}
+					return shMirrors(argAt(args, 0), n)
+				},
+			},
+		},
+	}
+}
+
+func init() { register(samehadakuScraper()) }

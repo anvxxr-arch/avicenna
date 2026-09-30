@@ -46,6 +46,15 @@ const config: Record<string, SectionConfig> = {
       ];
     },
   },
+  '/samehadaku': {
+    examples: [
+      { name: 'home', path: '/samehadaku/home' },
+      { name: 'search', path: '/samehadaku/search', params: { args: 'one piece' }, input: { key: 'args', placeholder: 'search anime…' } },
+      { name: 'detail', path: '/samehadaku/detail', params: { args: 'one-piece' }, input: { key: 'args', placeholder: 'anime slug…' } },
+      { name: 'episode', path: '/samehadaku/episode', params: { args: 'one-piece-episode-1180' } },
+      { name: 'batch', path: '/samehadaku/batch', params: { args: 'one-piece-batch' } },
+    ],
+  },
   '/film': {
     examples: [
       { name: 'detail', path: '/lk21/detail', params: { args: 'uprising-2026' }, input: { key: 'args', placeholder: 'film slug…' } },

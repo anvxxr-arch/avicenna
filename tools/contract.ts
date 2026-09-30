@@ -44,8 +44,8 @@ interface RunResult { exit: number; stdout: string; stderr: string }
 
 const SCRAPERS = [
   'anilist', 'animeindo', 'codeengo', 'drowify', 'freeconvert', 'lk21',
-  'otakudesu', 'sakana', 'spotify', 'tiktok', 'view-page-source', 'whitehouse',
-  'yt', 'ytmusic',
+  'otakudesu', 'sakana', 'samehadaku', 'spotify', 'tiktok', 'view-page-source',
+  'whitehouse', 'yt', 'ytmusic',
 ] as const;
 
 const GOLDEN_DIR = 'specs/003-scraper-unification/golden';
@@ -164,6 +164,11 @@ const MATRIX: Record<string, Array<[string[], string?]>> = {
     [['ongoing', '1']],
     [['genrelist']],
     [['detail', '../etc'], 'traversal slug must be rejected'],
+  ],
+  // samehadaku sits behind a Cloudflare managed challenge (like lk21): plain
+  // clients get HTTP 403, so only the CLI surface is checked here.
+  samehadaku: [
+    [['help'], undefined],
   ],
   sakana: [
     [['models'], 'requires SAKANA_FIREBASE_KEY; the actionable env error is the contract'],

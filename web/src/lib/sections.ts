@@ -32,6 +32,11 @@ export const SECTIONS: SectionDef[] = [
     endpoints: ['/home', '/search', '/anime', '/episode', '/stream', '/schedule', '/genre', '/season', '/more'], runtime: 'go', status: 'live', source: 's13.nontonanimeid.boats',
   },
   {
+    path: '/samehadaku', label: 'Samehadaku', blurb: 'Anime catalogue, search, episode mirrors and batch downloads.',
+    endpoints: ['/samehadaku/home', '/samehadaku/search', '/samehadaku/list', '/samehadaku/detail', '/samehadaku/episode', '/samehadaku/batch'],
+    runtime: 'go', status: 'live', source: 'v2.samehadaku.how',
+  },
+  {
     path: '/film', label: 'Film', blurb: 'LK21 movie listings, sections and per-title detail with download links.',
     endpoints: ['/lk21/list', '/lk21/sections', '/lk21/detail', '/lk21/list-detail'], runtime: 'go', status: 'live', source: 'tv12.lk21official.cc',
   },

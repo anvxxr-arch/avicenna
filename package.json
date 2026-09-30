@@ -24,6 +24,7 @@
     "nontonanime": "bun nontonanime.ts",
     "otakudesu": "bun otakudesu.ts",
     "sakana": "bun sakana.ts",
+    "samehadaku": "bun samehadaku.ts",
     "spotify": "bun spotify.ts",
     "tiktok": "bun tiktok.ts",
     "view-page-source": "bun view-page-source.ts",

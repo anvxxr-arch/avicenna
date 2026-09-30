@@ -62,6 +62,7 @@ bun codeengo.ts generate cyberpunk
 bun freeconvert.ts compress downloads/input.mp4 40
 bun view-page-source.ts view https://example.com
 bun anilist.ts populer
+bun samehadaku.ts detail one-piece
 bun sakana.ts chat "halo"
 ```
 
@@ -107,6 +108,7 @@ legacy/                archived pre-migration .js originals (reference only)
 | `API_ADMIN_TOKEN` | Go + Bun servers | enables `POST /admin/purge`; unset hides the route (404) |
 | `API_CORS` | both | `1` emits `Access-Control-Allow-Origin: *` |
 | `ANIME_BASE` | nontonanime | override the upstream anime host |
+| `SAMEHADAKU_BASE` / `SAMEHADAKU_COOKIE` | samehadaku | override base host / supply a Cloudflare-session cookie |
 | `SAKANA_FIREBASE_KEY` | sakana | required for chat/models — the key is not committed |
 | `YT_ANDROID_VR_KEY`, `YTM_API_KEY` | yt / ytmusic | optional inner keys for the `download` paths |
 | `PARITY_GO_BIN`, `PARITY_RS_BIN` | parity | override the port binaries under test |
