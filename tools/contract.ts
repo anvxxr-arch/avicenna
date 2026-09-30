@@ -27,6 +27,13 @@ interface Case {
   errorRe?: string;
   /** free-form note (e.g. why a command is expected to fail) */
   note?: string;
+  /**
+   * Live lists that mix item kinds (YouTube's related rail returns videos AND
+   * playlists in one response) make an array-union shape genuinely variable, so
+   * an exact union-size match is flaky. With this flag every variant recorded in
+   * the golden must still appear — new variants are allowed, lost ones are not.
+   */
+  allowVariants?: boolean;
 }
 interface Contract {
   scraper: string;
@@ -67,6 +74,26 @@ function shapeOf(v: unknown): unknown {
   return typeof v;
 }
 
+/**
+ * Variant-tolerant containment: every shape recorded in the golden must still be
+ * present in the live payload (recursively). Only unions may grow.
+ */
+/** Merge two shapes, unioning array variants (see allowVariants). */
+function mergeShapes(a: unknown, b: unknown): unknown {
+  if (JSON.stringify(a) === JSON.stringify(b)) return a;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const out = [...a];
+    for (const el of b) if (!out.some((x) => JSON.stringify(x) === JSON.stringify(el))) out.push(el);
+    return out.sort((x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1));
+  }
+  return a;
+}
+function shapeWithin(allowed: unknown, actual: unknown): boolean {
+  if (Array.isArray(allowed) && Array.isArray(actual)) {
+    return actual.every((a) => allowed.some((g) => shapeWithin(g, a)));
+  }
+  return JSON.stringify(allowed) === JSON.stringify(actual);
+}
 function diffShape(a: unknown, b: unknown, path = '$'): string | null {
   const ja = JSON.stringify(a);
   const jb = JSON.stringify(b);
@@ -98,6 +125,9 @@ function diffShape(a: unknown, b: unknown, path = '$'): string | null {
  * input that must SUCCEED (shape-recorded) or one that must FAIL cleanly
  * (exit 1 + actionable message).
  */
+/** Commands whose live list genuinely mixes item kinds (see Case.allowVariants). */
+const VARIANT_CASES = new Set(['yt search', 'yt related', 'ytmusic search', 'ytmusic related']);
+
 const MATRIX: Record<string, Array<[string[], string?]>> = {
   anilist: [
     [['populer'], 'anilist.co is a Vue SPA with the GraphQL API disabled server-side'],
@@ -195,7 +225,20 @@ async function capture(scraper: string): Promise<Contract> {
         if (/Commands:/.test(r.stdout)) parsed = { kind: 'help-text' };
         else throw new Error(`${scraper} ${args.join(' ')}: exit 0 but stdout is neither JSON nor help text:\n${r.stdout.slice(0, 200)}`);
       }
-      cases.push({ args, exit: 0, shape: shapeOf(parsed), note });
+      const variant = VARIANT_CASES.has(`${scraper} ${args[0]}`);
+      let shape = shapeOf(parsed);
+      if (variant) {
+        // the rail mixes videos and playlists across requests: sample a few times
+        // and merge, so the golden records every shape the contract allows.
+        for (let i = 0; i < 4; i++) {
+          const again = await run(scraper, args);
+          if (again.exit !== 0) continue;
+          try {
+            shape = mergeShapes(shape, shapeOf(JSON.parse(again.stdout)));
+          } catch { /* non-JSON help text: ignore */ }
+        }
+      }
+      cases.push({ args, exit: 0, shape, note, ...(variant ? { allowVariants: true } : {}) });
     } else {
       if (!r.stderr.trim()) throw new Error(`${scraper} ${args.join(' ')}: exit 1 with empty stderr`);
       cases.push({ args, exit: 1, errorRe: /\[ERROR\]/.source, note });
@@ -223,7 +266,10 @@ async function check(scraper: string, contract: Contract): Promise<string[]> {
         if (/Commands:/.test(r.stdout)) parsed = { kind: 'help-text' };
         else { fails.push(`${label}: stdout is neither JSON nor help text`); continue; }
       }
-      const d = diffShape(c.shape, shapeOf(parsed));
+      const spotted = shapeOf(parsed);
+      const d = c.allowVariants
+        ? (shapeWithin(c.shape, spotted) ? null : 'unrecorded shape variant')
+        : diffShape(c.shape, spotted);
       if (d) fails.push(`${label}: shape drift ${d}`);
     } else if (c.errorRe && !new RegExp(c.errorRe, 'i').test(r.stderr)) {
       fails.push(`${label}: stderr does not match /${c.errorRe}/`);

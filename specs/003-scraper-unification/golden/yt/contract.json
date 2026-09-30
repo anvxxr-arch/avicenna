@@ -1,6 +1,6 @@
 {
   "scraper": "yt",
-  "capturedAt": "2026-09-30T01:14:34.990Z",
+  "capturedAt": "2026-09-30T03:11:40.988Z",
   "cases": [
     {
       "args": [
@@ -95,8 +95,58 @@
               }
             ]
           ]
+        },
+        {
+          "key": "results",
+          "value": [
+            [
+              {
+                "key": "channel",
+                "value": "string"
+              },
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              },
+              {
+                "key": "views",
+                "value": "string"
+              }
+            ],
+            [
+              {
+                "key": "id",
+                "value": "string"
+              },
+              {
+                "key": "thumbnail",
+                "value": "string"
+              },
+              {
+                "key": "title",
+                "value": "string"
+              },
+              {
+                "key": "type",
+                "value": "string"
+              }
+            ]
+          ]
         }
-      ]
+      ],
+      "allowVariants": true
     },
     {
       "args": [
@@ -215,7 +265,8 @@
           "key": "videoId",
           "value": "string"
         }
-      ]
+      ],
+      "allowVariants": true
     }
   ]
 }

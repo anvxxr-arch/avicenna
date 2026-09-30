@@ -1,6 +1,6 @@
 {
   "scraper": "ytmusic",
-  "capturedAt": "2026-09-30T01:14:40.185Z",
+  "capturedAt": "2026-09-30T03:12:04.457Z",
   "cases": [
     {
       "args": [
@@ -78,7 +78,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "allowVariants": true
     },
     {
       "args": [
@@ -411,7 +412,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "allowVariants": true
     },
     {
       "args": [
@@ -493,7 +495,8 @@
           "key": "videoId",
           "value": "string"
         }
-      ]
+      ],
+      "allowVariants": true
     }
   ]
 }
