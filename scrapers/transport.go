@@ -67,10 +67,122 @@ var (
 )
 
 // IsBlockedHost reports whether a hostname is private, loopback, link-local or
-// otherwise never fetchable. Mirrors isBlockedHost() in core/fetch.ts.
+// otherwise never fetchable. Mirrors isBlockedHost() in core/fetch.ts, plus the
+// numeric IPv4/IPv6 obfuscations a WHATWG URL parser normalises but Go's
+// url.Parse keeps verbatim (decimal 2130706433, hex 0x7f000001, octal
+// 0177.0.0.1, short form 127.1, and long-form IPv4-mapped IPv6).
 func IsBlockedHost(host string) bool {
 	h := strings.ToLower(strings.Trim(strings.TrimSpace(host), "[]"))
-	return blockedHostRe.MatchString(h) || blockedV6Re.MatchString(h) || h == "localhost"
+	if blockedHostRe.MatchString(h) || blockedV6Re.MatchString(h) || h == "localhost" {
+		return true
+	}
+	return isPrivateIP(h)
+}
+
+func isPrivateIP(h string) bool {
+	// Bare numeric IPv4 or IPv6 literal?
+	ip := net.ParseIP(h)
+	if ip == nil {
+		if n, ok := parseNumericIPv4(h); ok {
+			ip = net.IPv4(byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
+		} else {
+			return false
+		}
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return isPrivateV4(ip4)
+	}
+	// IPv6: unspecified, loopback, IPv4-mapped, unique-local, link-local.
+	if ip.IsUnspecified() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return isPrivateV4(v4)
+	}
+	if ip[0]&0xfe == 0xfc { // fc00::/7 unique-local
+		return true
+	}
+	return false
+}
+
+// isPrivateV4 covers the ranges blocked for SSRF: loopback, private, and
+// link-local, plus 0.0.0.0.
+func isPrivateV4(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsUnspecified() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		(ip[0] == 169 && ip[1] == 254)
+}
+
+// parseNumericIPv4 accepts the non-dotted forms a browser would normalise:
+// a single 32-bit integer (decimal, 0x hex, leading-0 octal) or the short
+// "a.b" / "a.b.c" forms where the last part carries the remaining bytes.
+func parseNumericIPv4(h string) (uint64, bool) {
+	if h == "" {
+		return 0, false
+	}
+	if !strings.Contains(h, ".") {
+		n, ok := parseUintForm(h, 32)
+		return n, ok
+	}
+	parts := strings.Split(h, ".")
+	if len(parts) > 4 {
+		return 0, false
+	}
+	var vals []uint64
+	for _, p := range parts {
+		bits := uint(8)
+		if len(vals) == len(parts)-1 { // last part absorbs the remaining bytes
+			bits = 8 * uint(5-len(parts))
+		}
+		v, ok := parseUintForm(p, bits)
+		if !ok {
+			return 0, false
+		}
+		vals = append(vals, v)
+	}
+	var out uint64
+	for i, v := range vals {
+		if i == len(vals)-1 {
+			out |= v
+		} else {
+			out |= v << (8 * uint(3-i))
+		}
+	}
+	if out > 0xFFFFFFFF {
+		return 0, false
+	}
+	return out, true
+}
+
+// parseUintForm parses a decimal, 0x-hex or leading-0 octal integer of at most
+// the given width in bits.
+func parseUintForm(s string, bits uint) (uint64, bool) {
+	base := 10
+	digits := s
+	if len(s) > 2 && (s[0:2] == "0x" || s[0:2] == "0X") {
+		base, digits = 16, s[2:]
+	} else if len(s) > 1 && s[0] == '0' {
+		base, digits = 8, s[1:]
+	}
+	if digits == "" {
+		return 0, false
+	}
+	for i := 0; i < len(digits); i++ {
+		c := digits[i]
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f' && base == 16:
+		case c >= 'A' && c <= 'F' && base == 16:
+		default:
+			return 0, false
+		}
+	}
+	n, err := strconv.ParseUint(digits, base, int(bits))
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 // Sentinel errors for ParseTarget, so callers can map them onto their own
