@@ -1,0 +1,22 @@
+{
+  "scraper": "whitehouse",
+  "base": "https://www.whitehouse.gov",
+  "legacy": "legacy/whitehouse.js (12106 bytes, CJS)",
+  "migrated": "whitehouse.ts",
+  "commands": {
+    "home": "GET / -> {headline, deck, heroVideo, videoAccordion:[{title,url,video}], headings:[string], paragraphs:[string], url}",
+    "news": "GET /news/ -> listing",
+    "releases": "GET /releases/ -> listing",
+    "fact-sheets": "GET /fact-sheets/ -> listing",
+    "administration": "GET /administration/ -> {title, count, profiles:[{name,role,url,image,bio}]}",
+    "videos": "GET /videos/ -> {title, url, count, posts:[{title,url,thumbnail,duration,date,dateISO}], pagination}",
+    "search <keyword> [page]": "GET /?s=<kw>[&paged=<n>] -> {title,url,count,posts,filters:[{label,url,active}],pagination:{current,total,pages:[{number,url,current}],next}}",
+    "detail <url>": "GET <article> -> {url,title,category,categoryUrl,subcategory,byline,date,dateISO,eoNumber,sections,published,modified,wordCount,featuredImage,images,bodyText,bodyHtml}"
+  },
+  "output_shape": {
+    "listing_post": "{title:string, url:string, categories:[string], date:string, dateISO:string, thumbnail:null, postId:number}",
+    "detail": "{url,title,category,categoryUrl,subcategory,byline,date,dateISO,eoNumber,sections,published,modified,wordCount,featuredImage,images:[],bodyText:string,bodyHtml:string}"
+  },
+  "captured": "2026-09-10",
+  "verified": "shape-diff vs golden: 7/7 sections match (home, news, releases, fact-sheets, administration, videos, search) + detail live"
+}
