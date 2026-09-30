@@ -94,7 +94,7 @@ const config: Record<string, SectionConfig> = {
     examples: [
       { name: 'image styles', path: '/codeengo/styles' },
       { name: 'source token', path: '/viewpagesource/token' },
-      { name: 'image styles', path: '/codeengo/generate', params: { args: 'cyberpunk' }, input: { key: 'args', placeholder: 'style…' } },
+      { name: 'image styles', path: '/codeengo/styles' },
     ],
   },
 };

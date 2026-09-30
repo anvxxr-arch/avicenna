@@ -272,3 +272,27 @@ func TestAnilistSPAErrorIsActionable(t *testing.T) {
 		t.Errorf("SPAError must stay actionable: %q", SPAError)
 	}
 }
+
+// TestLocalOnlyCommandsAreNotRoutable pins the HTTP surface: a command that
+// touches the filesystem must be flagged LocalOnly, because api_go.go skips
+// flagged commands when it builds routes (a query string must never name a
+// server-side path).
+func TestLocalOnlyCommandsAreNotRoutable(t *testing.T) {
+	want := map[string][]string{
+		"codeengo":       {"generate", "test"},
+		"freeconvert":    {"compress"},
+		"tiktok":         {"download"},
+		"viewpagesource": {"view"},
+	}
+	for name, cmds := range want {
+		s, ok := Find(name)
+		if !ok {
+			t.Fatalf("scraper %q missing", name)
+		}
+		for _, c := range cmds {
+			if !s.Commands[c].LocalOnly {
+				t.Errorf("%s %s must be LocalOnly (it writes or reads local files)", name, c)
+			}
+		}
+	}
+}

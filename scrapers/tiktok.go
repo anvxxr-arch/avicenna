@@ -556,6 +556,8 @@ func tiktokScraper() Scraper {
 			},
 			"download": {
 				Name: "download", Desc: "Download video no-watermark", Usage: "<url> [nama.mp4]",
+				// writes the video file to a caller-named local path: CLI only.
+				LocalOnly: true,
 				Run: func(args []string, _ map[string]string) (any, error) {
 					if len(args) == 0 || args[0] == "" {
 						return nil, errors.New("Video URL required")

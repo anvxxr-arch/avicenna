@@ -129,6 +129,8 @@ func codeengoScraper() Scraper {
 			"generate": {
 				Desc:  "Generate an image from a style preset or freeform prompt",
 				Usage: "<style|prompt>",
+				// writes codeengo_<ms>.jpg to the working directory: CLI only.
+				LocalOnly: true,
 				Run: func(args []string, _ map[string]string) (any, error) {
 					arg := argAt(args, 0)
 					if arg == "" {
@@ -164,6 +166,8 @@ func codeengoScraper() Scraper {
 			},
 			"test": {
 				Desc: "Generate all styles (slow)",
+				// writes one image per style: CLI only.
+				LocalOnly: true,
 				Run: func([]string, map[string]string) (any, error) {
 					results := make([]any, 0, len(codeengoStyleNames))
 					for _, name := range codeengoStyleNames {

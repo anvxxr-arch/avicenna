@@ -73,7 +73,7 @@ export const SECTIONS: SectionDef[] = [
   },
   {
     path: '/tools', label: 'Tools', blurb: 'Codeengo text-to-image, FreeConvert video compression, page-source capture.',
-    endpoints: ['/codeengo/styles', '/codeengo/generate', '/viewpagesource/token'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
+    endpoints: ['/codeengo/styles', '/viewpagesource/token'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
   },
 ];
 
