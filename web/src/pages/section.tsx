@@ -48,16 +48,16 @@ const config: Record<string, SectionConfig> = {
   },
   '/film': {
     examples: [
-      { name: 'list', path: '/lk21/list' },
-      { name: 'sections', path: '/lk21/sections' },
       { name: 'detail', path: '/lk21/detail', params: { args: 'uprising-2026' }, input: { key: 'args', placeholder: 'film slug…' } },
+      { name: 'list (slow)', path: '/lk21/list' },
+      { name: 'sections (slow)', path: '/lk21/sections' },
     ],
   },
   '/music': {
     examples: [
-      { name: 'home', path: '/spotify/home' },
-      { name: 'search', path: '/spotify/search', params: { args: 'bad habits' }, input: { key: 'args', placeholder: 'track, artist, album…' } },
       { name: 'track', path: '/spotify/track', params: { args: '6PQ88X9TkUIAUIZJHW2upE' } },
+      { name: 'search', path: '/spotify/search', params: { args: 'bad habits' }, input: { key: 'args', placeholder: 'track, artist, album…' } },
+      { name: 'home (slow)', path: '/spotify/home' },
     ],
   },
   '/youtube': {
