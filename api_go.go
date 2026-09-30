@@ -1447,6 +1447,11 @@ func scraperRoutes() []*apiRoute {
 		sort.Strings(names)
 		for _, n := range names {
 			cmd := sc.Commands[n]
+			// Filesystem-touching commands stay CLI-only: a query string must
+			// never name a path on the server (read-and-upload, or write-out).
+			if cmd.LocalOnly {
+				continue
+			}
 			params := []apiParam{{
 				Name: "args", Desc: "positional arguments (?args=value, repeatable)",
 				Schema: map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},

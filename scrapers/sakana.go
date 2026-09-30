@@ -53,7 +53,7 @@ const (
 // calls (the pinned origin only).
 var sakanaChatHosts = []string{"chat.sakana.ai"}
 
-// firebaseHosts is the signup hop's explicit allowlist.
+// sakanaFirebaseHosts is the signup hop's explicit allowlist.
 var sakanaFirebaseHosts = []string{"identitytoolkit.googleapis.com"}
 
 // sakanaModels is MODELS from the reference, in order (the error message joins
@@ -133,18 +133,25 @@ func sakanaSignupIDToken() (string, error) {
 }
 
 // sakanaLoginCookie exchanges the id token for the sakana-chat= session cookie.
+//
+// The reference passes `redirect:'manual'`, but its core `request()` still throws
+// on any 3xx when `follow` is false — so a redirect here is an error, not a
+// cookie source (on the live site the login answers 2xx with Set-Cookie). The
+// hop therefore goes through the same redirect-refusing path as every other call.
 func sakanaLoginCookie(idToken string) (string, error) {
 	form := "idToken=" + EncodeURIComponent(idToken)
-	res, err := siteRequest(sakanaSite, sakanaBaseURL+"/api/auth/login", http.MethodPost,
+	res, err := sakanaApi(sakanaBaseURL+"/api/auth/login", http.MethodPost,
 		[]byte(form),
 		map[string]string{
 			"content-type": "application/x-www-form-urlencoded",
 			"origin":       sakanaBaseURL,
 			"referer":      sakanaBaseURL,
-		},
-		false, sakanaChatHosts)
+		})
 	if err != nil {
 		return "", err
+	}
+	if res.Status < 200 || res.Status >= 300 {
+		return "", fmt.Errorf("login HTTP %d", res.Status)
 	}
 	for _, raw := range res.Header.Values("Set-Cookie") {
 		name := raw
@@ -213,6 +220,13 @@ func sakanaGetConversations(limit int) ([]any, error) {
 	return rows, nil
 }
 
+// sakanaNull is the reference's `null` for a delete whose body is not JSON
+// (`res.json().catch(() => null)`). It is a value rather than a bare nil because
+// Clean drops untyped nils — and the reference does emit the key as null.
+type sakanaNull struct{}
+
+func (sakanaNull) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
 // sakanaDeleteConversation deletes one conversation. A non-JSON body is `null`,
 // like the reference's `res.json().catch(() => null)`.
 func sakanaDeleteConversation(id string) (any, error) {
@@ -229,8 +243,8 @@ func sakanaDeleteConversation(id string) (any, error) {
 		return nil, fmt.Errorf("delete HTTP %d", res.Status)
 	}
 	var v any
-	if err := json.Unmarshal(res.Body, &v); err != nil {
-		return nil, nil
+	if err := json.Unmarshal(res.Body, &v); err != nil || v == nil {
+		return sakanaNull{}, nil
 	}
 	return v, nil
 }
@@ -316,6 +330,65 @@ func sakanaUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
+// sakanaMultipartData frames the chat payload the way Bun's FormData does in the
+// reference: a multipart/form-data body whose single part is `data`.
+func sakanaMultipartData(payload string) (body []byte, contentType string, err error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {`form-data; name="data"`},
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err := part.Write([]byte(payload)); err != nil {
+		return nil, "", err
+	}
+	if err := mw.Close(); err != nil {
+		return nil, "", err
+	}
+	return buf.Bytes(), mw.FormDataContentType(), nil
+}
+
+// sakanaCollectStream walks the SSE body: it accumulates the `stream` tokens
+// (NUL-stripped, and handed to emit when the caller wants them echoed) and
+// returns the raw text plus the `createdMessage` messageId as delivered. Like
+// the reference's reader loop, a trailing partial line is never flushed and
+// non-JSON lines are skipped.
+func sakanaCollectStream(body []byte, emit func(string)) (string, any) {
+	lines := strings.Split(string(body), "\n")
+	if len(lines) > 0 {
+		lines = lines[:len(lines)-1]
+	}
+	full := ""
+	var messageID any
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		var ev map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &ev); err != nil {
+			continue // skip non-JSON lines
+		}
+		switch jstr(ev["type"]) {
+		case "createdMessage":
+			if v := ev["messageId"]; jbool(v) {
+				messageID = v
+			}
+		case "stream":
+			if v := ev["token"]; jbool(v) {
+				token := strings.ReplaceAll(jstr(v), "\x00", "")
+				full += token
+				if emit != nil {
+					emit(token)
+				}
+			}
+		}
+	}
+	return full, messageID
+}
+
 // sakanaChat mirrors chat() in the reference: create a conversation when none is
 // given, POST the follow-up message as multipart/form-data and accumulate the
 // SSE stream.
@@ -396,22 +469,13 @@ func sakanaChat(question string, o sakanaChatOpts) (sakanaChatResult, error) {
 	if err != nil {
 		return zero, err
 	}
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	part, err := mw.CreatePart(textproto.MIMEHeader{
-		"Content-Disposition": {`form-data; name="data"`},
-	})
+	mpBody, mpType, err := sakanaMultipartData(payloadJSON)
 	if err != nil {
 		return zero, err
 	}
-	if _, err := part.Write([]byte(payloadJSON)); err != nil {
-		return zero, err
-	}
-	mw.Close()
-
-	res, err := sakanaApi(sakanaBaseURL+"/conversation/"+convID, http.MethodPost, buf.Bytes(), map[string]string{
+	res, err := sakanaApi(sakanaBaseURL+"/conversation/"+convID, http.MethodPost, mpBody, map[string]string{
 		"cookie":           cookie,
-		"content-type":     mw.FormDataContentType(),
+		"content-type":     mpType,
 		"origin":           sakanaBaseURL,
 		"referer":          sakanaBaseURL,
 		"x-requested-with": "com.xbrowser.play",
@@ -423,37 +487,15 @@ func sakanaChat(question string, o sakanaChatOpts) (sakanaChatResult, error) {
 	if res.Status < 200 || res.Status >= 300 || res.Status == http.StatusNoContent {
 		return zero, fmt.Errorf("chat stream HTTP %d", res.Status)
 	}
-	full := ""
-	var msgID any
-	// The reference reads line by line and never flushes the trailing partial
-	// line, so the last fragment is dropped here too.
-	lines := strings.Split(string(res.Body), "\n")
-	if len(lines) > 0 {
-		lines = lines[:len(lines)-1]
+	var emit func(string)
+	if o.StreamOutput {
+		emit = func(token string) { fmt.Print(token) }
 	}
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		var ev map[string]any
-		if err := json.Unmarshal([]byte(trimmed), &ev); err != nil {
-			continue // non-JSON lines are skipped
-		}
-		switch jstr(ev["type"]) {
-		case "createdMessage":
-			if v := ev["messageId"]; jbool(v) {
-				msgID = v
-			}
-		case "stream":
-			if v := ev["token"]; jbool(v) {
-				token := strings.ReplaceAll(jstr(v), "\x00", "")
-				full += token
-				if o.StreamOutput {
-					fmt.Print(token)
-				}
-			}
-		}
+	full, msgID := sakanaCollectStream(res.Body, emit)
+	if msgID == nil {
+		// The reference returns `null` when the stream never announced a
+		// createdMessage; Clean drops bare nils, so the typed null carries it.
+		msgID = sakanaNull{}
 	}
 	cleaned := sakanaCleanText(sakanaStripTags(full))
 	if o.StreamOutput {

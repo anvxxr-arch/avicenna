@@ -363,6 +363,8 @@ func freeConvertScraper() Scraper {
 				Name:  "compress",
 				Desc:  "Upload + compress a video to target size percentage",
 				Usage: "<file> [target%]",
+				// reads a caller-named local file and uploads it: CLI only.
+				LocalOnly: true,
 				Run: func(args []string, _ map[string]string) (any, error) {
 					input := "downloads/input.mp4"
 					if len(args) > 0 {

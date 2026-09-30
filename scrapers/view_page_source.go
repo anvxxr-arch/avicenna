@@ -169,8 +169,10 @@ func viewPageSourceScraper() Scraper {
 		Title: "View-Page-Source Scraper",
 		Commands: map[string]Command{
 			"view": {
-				Desc:  "Fetch rendered source of a URL, save + return meta",
-				Usage: "<url>",
+				// writes source_<hash>.html next to the process: CLI only.
+				LocalOnly: true,
+				Desc:      "Fetch rendered source of a URL, save + return meta",
+				Usage:     "<url>",
 				Run: func(args []string, _ map[string]string) (any, error) {
 					url := argAt(args, 0)
 					if strings.TrimSpace(url) == "" {

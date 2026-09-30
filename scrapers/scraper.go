@@ -17,7 +17,12 @@ type Command struct {
 	Usage string
 	// Flags maps a flag name to "value" (may consume the next token) or "bool".
 	Flags map[string]string
-	Run   func(args []string, flags map[string]string) (any, error)
+	// LocalOnly marks a command that touches the local filesystem (reads an
+	// arbitrary path and uploads it, or writes a file next to the process).
+	// Such a command must never be exposed over HTTP: a query string cannot be
+	// allowed to name a server-side path. The HTTP route table skips these.
+	LocalOnly bool
+	Run       func(args []string, flags map[string]string) (any, error)
 }
 
 // Scraper is a named bundle of commands.
