@@ -243,7 +243,7 @@ func TestRegistryCoversPortedScrapers(t *testing.T) {
 		"lk21":           {"detail", "list", "list-detail", "sections"},
 		"otakudesu":      {"batch", "complete", "detail", "episode", "genre", "genrelist", "home", "jadwal", "ongoing", "search", "watch"},
 		"sakana":         {"chat", "conversations", "delete", "models"},
-		"samehadaku":     {"batch", "detail", "episode", "home", "list", "mirrors", "search"},
+		"samehadaku":     {"batch", "detail", "episode", "home", "list", "mirrors", "schedule", "search"},
 		"spotify":        {"album", "artist", "episode", "home", "playlist", "search", "show", "track"},
 		"tiktok":         {"download", "user", "video"},
 		"viewpagesource": {"token", "view"},

@@ -62,7 +62,6 @@ bun codeengo.ts generate cyberpunk
 bun freeconvert.ts compress downloads/input.mp4 40
 bun view-page-source.ts view https://example.com
 bun anilist.ts populer
-bun samehadaku.ts detail one-piece
 bun sakana.ts chat "halo"
 ```
 

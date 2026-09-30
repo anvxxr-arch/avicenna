@@ -18,12 +18,14 @@
 package scrapers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -547,6 +549,26 @@ func shBatch(rawSlug string) (map[string]any, error) {
 
 var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)
 
+var shScheduleDays = []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+
+// shSchedule mirrors schedule(): the weekly schedule comes from the site's own
+// REST endpoint, so the payload is the upstream array re-wrapped.
+func shSchedule(day string) (map[string]any, error) {
+	d := strings.ToLower(strings.TrimSpace(day))
+	if !slices.Contains(shScheduleDays, d) {
+		return nil, fmt.Errorf("Day must be one of: %s", strings.Join(shScheduleDays, ", "))
+	}
+	raw, err := shSite.Fetch("/wp-json/custom/v1/all-schedule?perpage=20&day=" + d)
+	if err != nil {
+		return nil, err
+	}
+	var items []any
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil, err
+	}
+	return map[string]any{"creator": "avicenna", "day": d, "count": len(items), "items": items}, nil
+}
+
 // samehadakuScraper builds the CLI surface (identical to the TS reference).
 func samehadakuScraper() Scraper {
 	return Scraper{
@@ -587,6 +609,12 @@ func samehadakuScraper() Scraper {
 				Name: "batch", Desc: "Batch download groups", Usage: "<slug|url>",
 				Run: func(args []string, _ map[string]string) (any, error) {
 					return shBatch(argAt(args, 0))
+				},
+			},
+			"schedule": {
+				Name: "schedule", Desc: "Weekly release schedule for one day", Usage: "<monday..sunday>",
+				Run: func(args []string, _ map[string]string) (any, error) {
+					return shSchedule(argAt(args, 0))
 				},
 			},
 			"mirrors": {

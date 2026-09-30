@@ -53,6 +53,7 @@ const config: Record<string, SectionConfig> = {
       { name: 'detail', path: '/samehadaku/detail', params: { args: 'one-piece' }, input: { key: 'args', placeholder: 'anime slug…' } },
       { name: 'episode', path: '/samehadaku/episode', params: { args: 'one-piece-episode-1180' } },
       { name: 'batch', path: '/samehadaku/batch', params: { args: 'one-piece-batch' } },
+      { name: 'schedule', path: '/samehadaku/schedule', params: { args: 'sunday' }, input: { key: 'args', placeholder: 'monday…sunday' } },
     ],
   },
   '/film': {

@@ -364,6 +364,19 @@ async function batch(rawSlug: string): Promise<Rec> {
   };
 }
 
+const SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+
+/** `schedule <day>`: the weekly release schedule, from the site's own REST endpoint. */
+async function schedule(day: string): Promise<Rec> {
+  const d = String(day || '').toLowerCase().trim();
+  if (!SCHEDULE_DAYS.includes(d as (typeof SCHEDULE_DAYS)[number])) {
+    throw new Error(`Day must be one of: ${SCHEDULE_DAYS.join(', ')}`);
+  }
+  const raw = await fetchPage(`/wp-json/custom/v1/all-schedule?perpage=20&day=${d}`);
+  const items = JSON.parse(raw) as Rec[];
+  return { creator: CREATOR, day: d, count: items.length, items };
+}
+
 if (import.meta.main) {
   defineCli({
     name: 'samehadaku',
@@ -396,6 +409,10 @@ if (import.meta.main) {
       mirrors: {
         desc: 'Resolve player mirrors via the player_ajax endpoint', usage: '<slug|url> [nume]',
         run: (p) => mirrors(p[0] || '', Number.parseInt(p[1] || '1', 10) || 1),
+      },
+      schedule: {
+        desc: 'Weekly release schedule for one day', usage: '<monday..sunday>',
+        run: (p) => schedule(p[0] || ''),
       },
     },
     examples: `  bun samehadaku.ts home
