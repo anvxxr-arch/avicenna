@@ -106,6 +106,8 @@ export function SectionPage({ section }: { section: SectionDef }) {
   const jsonRef = React.useRef<HTMLPreElement>(null);
 
   const example = cfg.examples[active];
+  /** No live endpoints wired yet: show the roadmap instead of an empty console. */
+  const planned = section.status === 'planned' || cfg.examples.length === 0;
 
   const load = React.useCallback(async () => {
     if (!example) return;
@@ -154,7 +156,31 @@ export function SectionPage({ section }: { section: SectionDef }) {
         </div>
         <p className="max-w-2xl text-sm text-muted">{section.blurb}</p>
       </header>
-
+      {planned ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>not wired yet</CardTitle>
+            <CardDescription>
+              No backend route exists for this source yet. It is listed so the roadmap stays honest — the page becomes a
+              live console the moment its scraper is registered under <code className="text-fg">/api/v1</code>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-2">
+              <Badge>scraper: not ported</Badge>
+              <Badge>runtime: {section.runtime}</Badge>
+              <Badge>status: planned</Badge>
+            </div>
+            <p className="text-xs text-muted">
+              Live instead: {SECTIONS.filter((s) => s.status !== 'planned').map((s) => s.label).join(' · ')}
+            </p>
+            <Link to="/docs">
+              <Button size="sm" variant="secondary">see live routes</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       <div className="flex flex-wrap items-center gap-2">
         {cfg.examples.map((ex, i) => (
           <Button
@@ -268,6 +294,8 @@ export function SectionPage({ section }: { section: SectionDef }) {
           </Card>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

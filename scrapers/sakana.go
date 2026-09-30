@@ -518,8 +518,8 @@ func sakanaScraper() Scraper {
 							"status":   "ok",
 						},
 						"data": map[string]any{
-							"text":           res.Text,
-							"conversationId": res.ConversationID,
+							"text":            res.Text,
+							"conversationId":  res.ConversationID,
 							"parentMessageId": res.ParentMessageID,
 						},
 					}), nil
