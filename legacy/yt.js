@@ -6,7 +6,8 @@
 
 const BASE = "https://m.youtube.com";
 const API = "https://m.youtube.com/youtubei/v1";
-const ANDROID_VR_KEY = "REDACTED";
+// sanitized (was a hardcoded public inner key); supply via env for `download`
+const ANDROID_VR_KEY = process.env.YT_ANDROID_VR_KEY || "";
 const UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 let config = null;

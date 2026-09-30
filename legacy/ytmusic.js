@@ -6,7 +6,8 @@
 
 const BASE = 'https://music.youtube.com';
 const API = BASE + '/youtubei/v1';
-const API_KEY = 'REDACTED';
+// sanitized (was a hardcoded inner key); empty key is accepted by youtubei WEB_REMIX
+const API_KEY = process.env.YTM_API_KEY || '';
 const CLIENT_VERSION = '1.20260804.16.00';
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';

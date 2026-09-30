@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pre-commit gate: block staged secrets.
+# Install once:  git config core.hooksPath .githooks
+exec bun tools/scan-secrets.ts

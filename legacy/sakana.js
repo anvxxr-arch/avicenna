@@ -14,7 +14,8 @@ const USER_AGENTS = [
 ];
 
 const BASE = 'https://chat.sakana.ai';
-const FIREBASE_KEY = 'REDACTED';
+// sanitized (was a hardcoded Firebase web key); supply via env
+const FIREBASE_KEY = process.env.SAKANA_FIREBASE_KEY || '';
 const MODELS = ['namazu', 'sakana', 'namazu-v2', 'namazu-pro', 'llama'];
 
 function randomUA() {
