@@ -45,7 +45,7 @@ export const SECTIONS: SectionDef[] = [
   },
   {
     path: '/youtube', label: 'YouTube', blurb: 'm.youtube + YouTube Music: search, video info, mixes, lyrics.',
-    endpoints: ['/youtube', '/ytmusic/search', '/ytmusic/info', '/ytmusic/lyrics', '/ytmusic/related', '/ytmusic/download'], runtime: 'go', status: 'live', source: 'm.youtube.com',
+    endpoints: ['/yt/search', '/yt/info', '/yt/related', '/ytmusic/search', '/ytmusic/info', '/ytmusic/lyrics', '/ytmusic/related'], runtime: 'go', status: 'live', source: 'm.youtube.com',
   },
   {
     path: '/tiktok', label: 'TikTok', blurb: 'Video stats, no-watermark URLs and public profile data.',
@@ -73,7 +73,7 @@ export const SECTIONS: SectionDef[] = [
   },
   {
     path: '/tools', label: 'Tools', blurb: 'Codeengo text-to-image, FreeConvert video compression, page-source capture.',
-    endpoints: ['/codeengo/styles', '/codeengo/generate', '/viewpagesource/token', '/viewpagesource/view'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
+    endpoints: ['/codeengo/styles', '/codeengo/generate', '/viewpagesource/token'], runtime: 'go', status: 'live', source: 'codeengo / freeconvert / view-page-source',
   },
 ];
 

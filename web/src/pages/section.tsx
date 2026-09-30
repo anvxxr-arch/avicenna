@@ -62,7 +62,10 @@ const config: Record<string, SectionConfig> = {
   },
   '/youtube': {
     examples: [
-      { name: 'search', path: '/ytmusic/search', params: { args: 'lofi', filter: 'songs' }, input: { key: 'args', placeholder: 'search videos or songs…' } },
+      { name: 'video search', path: '/yt/search', params: { args: 'lofi hip hop' }, input: { key: 'args', placeholder: 'search videos…' } },
+      { name: 'video info', path: '/yt/info', params: { args: 'dQw4w9WgXcQ' } },
+      { name: 'related', path: '/yt/related', params: { args: 'dQw4w9WgXcQ' } },
+      { name: 'music songs', path: '/ytmusic/search', params: { args: 'lofi', filter: 'songs' }, input: { key: 'args', placeholder: 'search songs…' } },
       { name: 'music lyrics', path: '/ytmusic/lyrics', params: { args: 'dQw4w9WgXcQ' } },
       { name: 'music related', path: '/ytmusic/related', params: { args: 'dQw4w9WgXcQ' } },
     ],
@@ -91,7 +94,7 @@ const config: Record<string, SectionConfig> = {
     examples: [
       { name: 'image styles', path: '/codeengo/styles' },
       { name: 'source token', path: '/viewpagesource/token' },
-      { name: 'page source', path: '/viewpagesource/view', params: { args: 'https://example.com' }, input: { key: 'args', placeholder: 'https://…' } },
+      { name: 'image styles', path: '/codeengo/generate', params: { args: 'cyberpunk' }, input: { key: 'args', placeholder: 'style…' } },
     ],
   },
 };
