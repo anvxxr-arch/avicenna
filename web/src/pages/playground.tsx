@@ -16,13 +16,12 @@ const PRESETS: Array<{ label: string; path: string; params?: Record<string, stri
   { label: 'anime search', path: '/search', params: { q: 'one piece' } },
   { label: 'schedule', path: '/schedule' },
   { label: 'film list', path: '/lk21/list' },
-  { label: 'film detail', path: '/lk21/detail', params: { slug: 'uprising-2026' } },
-  { label: 'music search', path: '/music/search', params: { q: 'bad habits' } },
-  { label: 'youtube search', path: '/youtube/search', params: { q: 'lofi hip hop' } },
-  { label: 'yt music songs', path: '/youtube-music/search', params: { q: 'bad habits', filter: 'songs' } },
-  { label: 'tiktok user', path: '/tiktok/user', params: { username: 'nasa' } },
-  { label: 'whitehouse news', path: '/whitehouse/sections', params: { section: 'news' } },
-  { label: 'drowify search', path: '/drowify/search', params: { q: 'lofi' } },
+  { label: 'film detail', path: '/lk21/detail', params: { args: 'uprising-2026' } },
+  { label: 'spotify search', path: '/spotify/search', params: { args: 'bad habits' } },
+  { label: 'yt music songs', path: '/ytmusic/search', params: { args: 'lofi', filter: 'songs' } },
+  { label: 'tiktok user', path: '/tiktok/user', params: { args: 'nasa' } },
+  { label: 'whitehouse news', path: '/whitehouse/news' },
+  { label: 'drowify search', path: '/drowify/search', params: { args: 'lofi' } },
 ];
 
 function parseParams(raw: string): Record<string, string> {
@@ -109,7 +108,7 @@ export function PlaygroundPage() {
             <Input
               value={params}
               onChange={(e) => setParams(e.target.value)}
-              placeholder="q=one piece&page=1"
+              placeholder="args=nasa&page=1"
               aria-label="query string"
               onKeyDown={(e) => e.key === 'Enter' && void send()}
             />

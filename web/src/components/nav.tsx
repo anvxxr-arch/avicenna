@@ -9,7 +9,6 @@ import { Menu, X } from 'lucide-react';
 const NAV_ROUTES = [
   ...PRIMARY_PAGES.map((p) => p.href),
   ...SECTIONS.map((s) => s.path),
-  '/anime/:id', '/youtube/:id', '/music/:id', '/film/:id',
 ];
 
 const STATUS_TONE: Record<string, string> = {

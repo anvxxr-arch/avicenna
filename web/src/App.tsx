@@ -10,7 +10,7 @@ import { SECTIONS } from './lib/sections';
 import { Button } from './components/ui/button';
 
 /** All static routes, in match order. */
-const ROUTES = ['/', '/docs', '/playground', '/about', ...SECTIONS.map((s) => s.path)];
+const ROUTES = ['/', '/docs', '/playground', '/playgrounds', '/about', ...SECTIONS.map((s) => s.path)];
 
 function NotFound({ path }: { path: string }) {
   return (
@@ -40,6 +40,7 @@ function Router() {
     case '/docs':
       return <DocsPage />;
     case '/playground':
+    case '/playgrounds':
       return <PlaygroundPage />;
     case '/about':
       return <AboutPage />;
