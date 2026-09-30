@@ -278,21 +278,22 @@ func shHome(page int) (map[string]any, error) {
 			cards = append(cards, c)
 		}
 	})
+	// On this theme the "Latest Episode" rail is the same post-show card list, so
+	// the feed is the subset of cards carrying an episode number.
 	latest := []any{}
-	doc.Find("div.widget_senction li, .widget_senction .lstepsiode li").Each(func(_ int, el *goquery.Selection) {
-		href, ok := el.Find(`a[href*="episode"], a[href*="/anime/"]`).First().Attr("href")
-		if !ok || !strings.Contains(strings.ToLower(href), "episode") {
-			return
+	for _, c := range cards {
+		m, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		ep, _ := m["episode"].(string)
+		if ep == "" {
+			continue
 		}
 		latest = append(latest, map[string]any{
-			"title":   Txt(el.Find(".lchx a, .entry-title a, a").First().Text(), 160),
-			"url":     shAbs(href),
-			"episode": nilOrStr(Txt(el.Find(".eps a").First().Text(), 12)),
-			"date":    nilOrStr(Txt(el.Find(".date").First().Text(), 40)),
+			"title": m["title"], "url": m["url"], "slug": m["slug"],
+			"episode": ep, "releasedOn": m["releasedOn"],
 		})
-	})
-	if len(latest) > 20 {
-		latest = latest[:20]
 	}
 	return map[string]any{
 		"creator": "avicenna", "page": p, "url": pageURL,
@@ -513,7 +514,13 @@ func shEpisode(rawSlug string) (map[string]any, error) {
 		if !strings.Contains(href, "/anime/") {
 			return true
 		}
-		anime = map[string]any{"title": Txt(a.Text(), 160), "slug": shSlug(shAbs(href)), "url": shAbs(href)}
+		label := Txt(a.Text(), 160)
+		// The back-link reads "All Episode"; only a real title is worth reporting.
+		var title any
+		if !strings.EqualFold(label, "all episode") && label != "" {
+			title = label
+		}
+		anime = map[string]any{"title": title, "slug": shSlug(shAbs(href)), "url": shAbs(href)}
 		return false
 	})
 	var prev, next any

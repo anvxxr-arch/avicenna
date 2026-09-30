@@ -134,19 +134,17 @@ async function home(page = 1): Promise<Rec> {
     const c = parsePostShowCard($, el);
     if (c) cards.push(c);
   });
-  const latest: Rec[] = [];
-  $('div.widget_senction li, .widget_senction .lstepsiode li').each((_, el) => {
-    const $el = $(el);
-    const a = $el.find('a[href*="episode"], a[href*="/anime/"]').first();
-    const href = abs(a.attr('href'));
-    if (!href || !/episode/i.test(href)) return;
-    latest.push({
-      title: txt($el.find('.lchx a, .entry-title a, a').first().text(), 160),
-      url: href,
-      episode: txt($el.find('.eps a').first().text(), 12) || null,
-      date: txt($el.find('.date').first().text(), 40) || null,
-    });
-  });
+  // On this theme the "Latest Episode" rail is the same post-show card list, so
+  // the feed is the subset of cards carrying an episode number.
+  const latest = cards
+    .filter((c) => typeof c.episode === 'string' && c.episode !== '')
+    .map((c) => ({
+      title: c.title,
+      url: c.url,
+      slug: c.slug,
+      episode: c.episode,
+      releasedOn: c.releasedOn ?? null,
+    }));
   return { creator: CREATOR, page: p, url, count: cards.length, cards, latestEpisode: latest.slice(0, 20) };
 }
 
@@ -319,7 +317,11 @@ async function episode(rawSlug: string): Promise<Rec> {
     anime: (() => {
       const a = $('.naveps a').filter((_, x) => /\/anime\//.test($(x).attr('href') || '')).first();
       const href = abs(a.attr('href'));
-      return href ? { title: txt(a.text(), 160), slug: slugOf(href), url: href } : null;
+      if (!href) return null;
+      const label = txt(a.text(), 160);
+      // The back-link reads "All Episode"; only a real title is worth reporting.
+      const title = /^all episode$/i.test(label) ? null : label || null;
+      return { title, slug: slugOf(href), url: href };
     })(),
     players,
     downloads: downloadable,
