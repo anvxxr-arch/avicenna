@@ -23,7 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"math"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -178,7 +179,7 @@ func (r *rateLimiter) run(fn func() ([]byte, error)) ([]byte, error) {
 	wait := r.delay - (now - r.last)
 	r.mu.Unlock()
 	if wait > 0 {
-		time.Sleep(time.Duration(wait+rand.Int63n(jitterMS)) * time.Millisecond)
+		time.Sleep(time.Duration(wait+rand.Int64N(jitterMS)) * time.Millisecond)
 	}
 	out, err := fn()
 	r.mu.Lock()
@@ -561,7 +562,7 @@ func (s *Site) withRetry(fn func() ([]byte, error)) ([]byte, error) {
 				backoff = 8000
 			}
 		}
-		time.Sleep(time.Duration(backoff+rand.Int63n(300)) * time.Millisecond)
+		time.Sleep(time.Duration(backoff+rand.Int64N(300)) * time.Millisecond)
 	}
 	return nil, last
 }
@@ -849,6 +850,150 @@ func (s *Site) ExternalText(rawURL string, body []byte, contentType string, extr
 	return string(res.Body), res, nil
 }
 
+// === JSON / URL HELPERS (JS semantics) ===
+
+// EncodeURIComponent mirrors JS encodeURIComponent.
+func EncodeURIComponent(s string) string {
+	var sb strings.Builder
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9',
+			c == '-', c == '_', c == '.', c == '!', c == '~', c == '*', c == '\'', c == '(', c == ')':
+			sb.WriteByte(c)
+		default:
+			fmt.Fprintf(&sb, "%%%02X", c)
+		}
+	}
+	return sb.String()
+}
+
+// JSONStringify mirrors JSON.stringify: no whitespace, no HTML escaping,
+// numbers emitted with ECMAScript Number→string semantics.
+func JSONStringify(v any) (string, error) {
+	var sb strings.Builder
+	if err := writeJSON(&sb, v); err != nil {
+		return "", err
+	}
+	return sb.String(), nil
+}
+
+func writeJSON(sb *strings.Builder, v any) error {
+	switch t := v.(type) {
+	case nil:
+		sb.WriteString("null")
+	case string:
+		writeJSONString(sb, t)
+	case bool:
+		if t {
+			sb.WriteString("true")
+		} else {
+			sb.WriteString("false")
+		}
+	case json.Number:
+		sb.WriteString(jsonNumberString(t))
+	case float64:
+		sb.WriteString(numberString(t))
+	case float32:
+		sb.WriteString(numberString(float64(t)))
+	case int:
+		sb.WriteString(strconv.Itoa(t))
+	case int64:
+		sb.WriteString(strconv.FormatInt(t, 10))
+	case []any:
+		sb.WriteByte('[')
+		for i, el := range t {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			if err := writeJSON(sb, el); err != nil {
+				return err
+			}
+		}
+		sb.WriteByte(']')
+	case map[string]any:
+		sb.WriteByte('{')
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			writeJSONString(sb, k)
+			sb.WriteByte(':')
+			if err := writeJSON(sb, t[k]); err != nil {
+				return err
+			}
+		}
+		sb.WriteByte('}')
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		sb.Write(b)
+	}
+	return nil
+}
+
+func jsonNumberString(n json.Number) string {
+	if _, err := strconv.ParseInt(n.String(), 10, 64); err == nil {
+		return n.String()
+	}
+	if f, err := n.Float64(); err == nil {
+		return numberString(f)
+	}
+	return n.String()
+}
+
+// numberString renders a float64 the way ECMAScript does for the common range
+// (integers stay integers, no exponent below 1e21).
+func numberString(f float64) string {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return "null" // JSON.stringify(NaN|Infinity) === 'null'
+	}
+	if f == math.Trunc(f) && math.Abs(f) < 1e21 {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	abs := math.Abs(f)
+	if abs >= 1e-6 && abs < 1e21 {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	return strconv.FormatFloat(f, 'e', -1, 64)
+}
+
+func writeJSONString(sb *strings.Builder, s string) {
+	sb.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			sb.WriteString(`\"`)
+		case '\\':
+			sb.WriteString(`\\`)
+		case '\n':
+			sb.WriteString(`\n`)
+		case '\r':
+			sb.WriteString(`\r`)
+		case '\t':
+			sb.WriteString(`\t`)
+		case '\b':
+			sb.WriteString(`\b`)
+		case '\f':
+			sb.WriteString(`\f`)
+		default:
+			if r < 0x20 {
+				fmt.Fprintf(sb, `\u%04x`, r)
+			} else {
+				sb.WriteRune(r)
+			}
+		}
+	}
+	sb.WriteByte('"')
+}
+
 // === PARSE HELPERS (core/parse.ts) ===
 
 // SafeDoc mirrors safeCheerio(): 2MB source cap.
@@ -954,11 +1099,4 @@ func GetStr(m map[string]any, key string) string {
 		}
 	}
 	return ""
-}
-
-// sortStrings is a tiny helper used by dedupe paths.
-func sortStrings(in []string) []string {
-	out := append([]string(nil), in...)
-	sort.Strings(out)
-	return out
 }
