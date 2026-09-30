@@ -20,6 +20,30 @@ const site = createSite({ base: BASE, rateMs: 400, headers: { 'user-agent': UA, 
 const { fetchPage, isValidUrl } = site;
 
 interface Cfg { key: string; version: string; visitorData: string; gl: string; }
+/** Fields shared by the legacy search renderers (`videoWithContextRenderer`, `compact*Renderer`). */
+interface SearchRenderer extends Record<string, unknown> {
+  videoId?: string;
+  playlistId?: string;
+  channelId?: string;
+  headline?: { runs?: Array<{ text: string }> };
+  title?: { runs?: Array<{ text: string }> };
+  shortBylineText?: { runs?: Array<{ text: string }> };
+  shortViewCountText?: { runs?: Array<{ text: string }> };
+  videoCountText?: { runs?: Array<{ text: string }> };
+  subscriberCountText?: { runs?: Array<{ text: string }> };
+  thumbnail?: { thumbnails?: Array<{ url: string; width?: number }> };
+}
+type Thumbs = Array<{ url: string; width?: number }>;
+/** `{ image: { sources } }` — the thumbnail carry shape in modern ViewModels. */
+interface ThumbViewModel { image?: { sources?: Thumbs } }
+interface LockupBadge { thumbnailBadgeViewModel?: { text?: unknown } }
+interface LockupImage { sources?: Thumbs; overlays?: Array<{ thumbnailBottomOverlayViewModel?: { badges?: LockupBadge[] } }> }
+/** Shape of a `lockupViewModel` node (playlist grids, channel tabs). */
+interface LockupViewModel {
+  metadata?: { lockupMetadataViewModel?: { title?: { content?: unknown } } };
+  contentImage?: { thumbnailViewModel?: { image?: LockupImage } };
+  contentId?: unknown;
+}
 let config: Cfg | null = null;
 
 async function bootstrap(force = false): Promise<Cfg> {
@@ -70,28 +94,15 @@ function thumbnail(thumbnails: Array<{ url: string; width?: number }> | undefine
   const sorted = [...thumbnails].sort((a, b) => (b.width || 0) - (a.width || 0));
   return sorted[0].url;
 }
-/** Safe property read on untrusted JSON: `undefined` when the parent is not an object. */
-function get<T>(o: unknown, k: string): T | undefined {
-  return o && typeof o === 'object' ? (o as Record<string, unknown>)[k] as T : undefined;
-}
-/** `{ runs: [{ text }] }` (or a missing field) → the runs array, else undefined. */
-function runsOf(x: unknown): Array<{ text: string }> | undefined {
-  return get<Array<{ text: string }>>(x, 'runs');
-}
-/** `{ thumbnails: [{ url, width }] }` (or a missing field) → the thumbnails array, else undefined. */
-function thumbsOf(x: unknown): Array<{ url: string; width?: number }> | undefined {
-  return get<Array<{ url: string; width?: number }>>(x, 'thumbnails');
-}
-
-function findAll(obj: unknown, key: string, out: unknown[] = []): unknown[] {
+function findAll<T = unknown>(obj: unknown, key: string, out: T[] = []): T[] {
   if (!obj || typeof obj !== 'object') return out;
   if (Array.isArray(obj)) {
-    for (const item of obj) findAll(item, key, out);
+    for (const item of obj) findAll<T>(item, key, out);
     return out;
   }
   for (const [k, v] of Object.entries(obj)) {
-    if (k === key) out.push(v);
-    else findAll(v, key, out);
+    if (k === key) out.push(v as T);
+    else findAll<T>(v, key, out);
   }
   return out;
 }
@@ -135,50 +146,50 @@ async function search(query: string, page = 1): Promise<Record<string, unknown>>
 
 function parseSearchItem(item: Record<string, unknown>): Record<string, unknown> | Array<Record<string, unknown>> | null {
   if (item.videoWithContextRenderer) {
-    const v = item.videoWithContextRenderer as Record<string, never>;
+    const v = item.videoWithContextRenderer as SearchRenderer;
     return {
       type: 'video',
       id: v.videoId,
-      title: text(v.headline && v.headline.runs),
-      channel: text(v.shortBylineText && v.shortBylineText.runs),
-      views: text(v.shortViewCountText && v.shortViewCountText.runs),
-      thumbnail: thumbnail(v.thumbnail && v.thumbnail.thumbnails),
+      title: text(v.headline?.runs),
+      channel: text(v.shortBylineText?.runs),
+      views: text(v.shortViewCountText?.runs),
+      thumbnail: thumbnail(v.thumbnail?.thumbnails),
     };
   }
   if (item.compactRadioRenderer) {
-    const v = item.compactRadioRenderer as Record<string, never>;
+    const v = item.compactRadioRenderer as SearchRenderer;
     return {
       type: 'mix',
       id: v.playlistId,
-      title: text(v.title && v.title.runs),
-      videoCount: text(v.videoCountText && v.videoCountText.runs),
-      thumbnail: thumbnail(v.thumbnail && v.thumbnail.thumbnails),
+      title: text(v.title?.runs),
+      videoCount: text(v.videoCountText?.runs),
+      thumbnail: thumbnail(v.thumbnail?.thumbnails),
     };
   }
   if (item.compactPlaylistRenderer) {
-    const v = item.compactPlaylistRenderer as Record<string, never>;
+    const v = item.compactPlaylistRenderer as SearchRenderer;
     return {
       type: 'playlist',
       id: v.playlistId,
-      title: text(v.title && v.title.runs),
-      channel: text(v.shortBylineText && v.shortBylineText.runs),
-      videoCount: text(v.videoCountText && v.videoCountText.runs),
-      thumbnail: thumbnail(v.thumbnail && v.thumbnail.thumbnails),
+      title: text(v.title?.runs),
+      channel: text(v.shortBylineText?.runs),
+      videoCount: text(v.videoCountText?.runs),
+      thumbnail: thumbnail(v.thumbnail?.thumbnails),
     };
   }
   if (item.compactChannelRenderer) {
-    const v = item.compactChannelRenderer as Record<string, never>;
+    const v = item.compactChannelRenderer as SearchRenderer;
     return {
       type: 'channel',
       id: v.channelId,
-      title: text(v.title && v.title.runs),
-      subscribers: text(v.subscriberCountText && v.subscriberCountText.runs),
-      videoCount: text(v.videoCountText && v.videoCountText.runs),
-      thumbnail: thumbnail(v.thumbnail && v.thumbnail.thumbnails),
+      title: text(v.title?.runs),
+      subscribers: text(v.subscriberCountText?.runs),
+      videoCount: text(v.videoCountText?.runs),
+      thumbnail: thumbnail(v.thumbnail?.thumbnails),
     };
   }
   if (item.gridShelfViewModel) {
-    return findAll(item.gridShelfViewModel, 'shortsLockupViewModel').map(parseShort);
+    return findAll<Record<string, unknown>>(item.gridShelfViewModel, 'shortsLockupViewModel').map(parseShort);
   }
   return null;
 }
@@ -244,13 +255,14 @@ async function infoVideo(videoId: string): Promise<Record<string, unknown>> {
 }
 
 function parseLockup(v: Record<string, unknown>): Record<string, unknown> {
-  const md = ((v.metadata as Record<string, unknown>)?.lockupMetadataViewModel as Record<string, unknown>) || {};
-  const title = (md.title as Record<string, unknown>)?.content;
-  const img = ((v.contentImage as Record<string, unknown>)?.thumbnailViewModel as Record<string, unknown>)?.image as Record<string, unknown> || {};
-  const badges = ((img.overlays as Array<Record<string, unknown>>) || [])
-    .map((o) => (o.thumbnailBottomOverlayViewModel as Record<string, unknown>)?.badges || [])
+  const v2 = v as LockupViewModel; // untrusted JSON boundary: accessed field-by-field with optional chaining
+  const md = v2.metadata?.lockupMetadataViewModel || {};
+  const title = md.title?.content;
+  const img = v2.contentImage?.thumbnailViewModel?.image || {};
+  const badges = (img.overlays || [])
+    .map((o) => o.thumbnailBottomOverlayViewModel?.badges || [])
     .flat()
-    .map((b) => (b.thumbnailBadgeViewModel as Record<string, unknown>)?.text)
+    .map((b) => b.thumbnailBadgeViewModel?.text)
     .find(Boolean);
   const parts = findAll(md, 'metadataParts').flat();
   const stats = parts.map((p) => p && (p as Record<string, unknown>).text && viewModelText((p as Record<string, unknown>).text)).filter(Boolean);
@@ -262,7 +274,7 @@ function parseLockup(v: Record<string, unknown>): Record<string, unknown> {
     length: badges || null,
     views: stats[1] || null,
     published: stats[2] || null,
-    thumbnail: thumbnail((img as { sources?: Array<{ url: string; width?: number }> }).sources),
+    thumbnail: thumbnail(img.sources),
   };
 }
 
@@ -278,7 +290,9 @@ async function infoPlaylist(id: string): Promise<Record<string, unknown>> {
   const avatarStack = (findAll(phvm, 'avatarStackViewModel')[0] || {}) as Record<string, unknown>;
   const ownerEndpoint = (findAll(avatarStack, 'browseEndpoint')[0] || {}) as Record<string, unknown>;
   const ownerAvatar = (findAll(avatarStack, 'avatarViewModel')[0] || {}) as Record<string, unknown>;
-  const videos = findAll(json, 'lockupViewModel').map(parseLockup);
+  const videos = findAll<Record<string, unknown>>(json, 'lockupViewModel').map(parseLockup);
+  const thumbVM = (findAll<Record<string, unknown>>(phvm, 'thumbnailViewModel')[0] || {}) as Record<string, unknown>;
+  const thumbImage = thumbVM.image as { sources?: Thumbs } | undefined;
   return {
     type: 'playlist',
     id,
@@ -289,7 +303,7 @@ async function infoPlaylist(id: string): Promise<Record<string, unknown>> {
     channel: viewModelText(avatarStack.text) || partsText[0] || null,
     channelId: ownerEndpoint.browseId || null,
     avatar: thumbnail((ownerAvatar as { image?: { sources?: Array<{ url: string; width?: number }> } }).image?.sources),
-    thumbnail: thumbnail((((findAll(phvm, 'thumbnailViewModel')[0] || {}) as Record<string, unknown>).image as Record<string, unknown>)?.sources ? (findAll(phvm, 'thumbnailViewModel')[0] as Record<string, unknown>).image && thumbnail(((findAll(phvm, 'thumbnailViewModel')[0] as Record<string, unknown>).image as { sources?: Array<{ url: string; width?: number }> }).sources) : null),
+    thumbnail: thumbnail(thumbImage?.sources),
     videos,
   };
 }
@@ -326,7 +340,7 @@ async function infoMix(id: string): Promise<Record<string, unknown>> {
   const pls = pl.playlist as Record<string, unknown> || {};
   const videos = ((pls.contents as Array<Record<string, unknown>>) || [])
     .map((c) => c.playlistPanelVideoRenderer)
-    .filter(Boolean)
+    .filter((c): c is Record<string, unknown> => !!c)
     .map(parsePanelVideo);
   return { type: 'mix', id, title: pls.title || 'Mix', videos };
 }

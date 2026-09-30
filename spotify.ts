@@ -113,6 +113,7 @@ function artistsName(items: unknown): string[] {
 
 function fmtGraphTrack(t: Rec): Rec {
   const albumOf = (t.albumOfTrack as Rec) || {};
+  const audioPreviews = get<Rec>(t.previews, 'audioPreviews');
   return {
     title: t.name,
     id: t.id,
@@ -125,7 +126,7 @@ function fmtGraphTrack(t: Rec): Rec {
     duration: duration((t.duration as Rec)?.totalMilliseconds),
     explicit: t.contentRating ? (t.contentRating as Rec).label === 'EXPLICIT' : false,
     playcount: t.playcount || null,
-    preview: (t.audioPreview as Rec)?.url || (t.previews as Rec)?.audioPreviews?.items?.[0]?.url || null,
+    preview: (t.audioPreview as Rec)?.url || get<Array<Rec>>(audioPreviews, 'items')?.[0]?.url || null,
     cover: imgUrl(albumOf.coverArt) || imgUrl((t.visualIdentity as Rec)?.squareCoverImage),
   };
 }
@@ -171,10 +172,11 @@ async function track(id: string): Promise<Rec> {
     const preview = (embed?.audioPreview as Rec)?.url;
     if (preview) out.preview = preview;
   }
-  const rel = t.associationsV3?.related as Rec | undefined;
-  if (rel?.items?.length) {
-    out.relatedTracks = rel.items.map((r) => {
-      const d = (r as Rec).data || r;
+  const rel = (t.associationsV3 as Rec | undefined)?.related as Rec | undefined;
+  const relItems = get<Array<Rec>>(rel, 'items');
+  if (relItems?.length) {
+    out.relatedTracks = relItems.map((r) => {
+      const d = (r.data as Rec) || r;
       return { title: d.name, id: d.id, uri: d.uri };
     });
   }
@@ -199,7 +201,7 @@ async function album(id: string): Promise<Rec> {
     cover: imgUrl(a.coverArt),
     tracks,
   };
-  const more = a.moreAlbumsByArtist?.items as Array<Rec> | undefined;
+  const more = get<Array<Rec>>(a.moreAlbumsByArtist, 'items');
   if (more?.length) {
     out.moreAlbums = more.map((m) => ({
       title: m.name, id: m.id, uri: m.uri, releaseYear: (m.date as Rec)?.year, cover: imgUrl(m.coverArt),
@@ -217,8 +219,8 @@ async function artist(id: string): Promise<Rec> {
       uri, offset: 0, limit: 100,
       includePrerelease: false, includeSingles: true, includeAlbums: true, includeCompilations: true,
     }),
-  ]) as Array<Rec>;
-  const a = overview?.artistUnion as Rec;
+  ]);
+  const a = get<Rec>(overview, 'artistUnion');
   if (!a) return { error: 'Artist not found' };
 
   function fmtRelease(x: Rec): Rec {
@@ -236,8 +238,9 @@ async function artist(id: string): Promise<Rec> {
     }).reduce((acc: Array<Rec>, cur) => acc.concat(cur), []);
   }
 
-  const allItems = disc?.artistUnion?.discography?.all;
-  const allList = (((allItems?.items as Array<Rec>) || []).map((i) => (i.releases?.items as Array<Rec>) || [i]))
+  const allItems = get<Rec>(get<Rec>(get<Rec>(disc, 'artistUnion'), 'discography'), 'all');
+  const allList = (get<Array<Rec>>(allItems, 'items') || [])
+    .map((i) => get<Array<Rec>>(get<Rec>(i, 'releases'), 'items') || [i])
     .reduce((acc: Array<Rec>, cur) => acc.concat(cur), []);
   function splitByType(type: string): Array<Rec> {
     return allList.filter((r) => {
@@ -255,7 +258,7 @@ async function artist(id: string): Promise<Rec> {
     name: profile.name,
     id: a.id,
     uri: a.uri,
-    verified: !!(a.visuals as Rec)?.avatarImage?.extractedColors,
+    verified: !!get(get(get(a, 'visuals'), 'avatarImage'), 'extractedColors'),
     stats: a.stats ? {
       followers: (a.stats as Rec).followers,
       monthlyListeners: (a.stats as Rec).monthlyListeners,
@@ -277,19 +280,19 @@ async function artist(id: string): Promise<Rec> {
       name: (ra.profile as Rec)?.name, id: ra.id, uri: ra.uri, image: imgUrl((ra.visuals as Rec)?.avatarImage),
     })),
     appearsOn: releases(relContent.appearsOn),
-    featuring: (((relContent.featuringV2 as Rec)?.items as Array<Rec>) || []).map((f) => {
-      const d = f.data || f;
+    featuring: (get<Array<Rec>>(get<Rec>(relContent, 'featuringV2'), 'items') || []).map((f) => {
+      const d = (f.data as Rec) || f;
       return { name: d.name, id: d.id, uri: d.uri, cover: imgUrl(d.images) };
     }),
     biography: profile.biography ? (profile.biography as Rec).text : null,
     externalLinks: (((profile.externalLinks as Rec)?.items as Array<Rec>) || []).map((l) => ({ name: l.name, url: l.url })),
-    artistPlaylists: (((profile.playlistsV2 as Rec)?.items as Array<Rec>) || []).map((p) => {
-      const d = p.data || p;
+    artistPlaylists: (get<Array<Rec>>(get<Rec>(profile, 'playlistsV2'), 'items') || []).map((p) => {
+      const d = (p.data as Rec) || p;
       return { name: d.name, id: d.id, uri: d.uri, cover: imgUrl(d.images) };
     }),
   };
 
-  const rel = related?.artistUnion as Rec | undefined;
+  const rel = get<Rec>(related, 'artistUnion');
   if (rel?.relatedContent) {
     const list = (((rel.relatedContent as Rec).relatedArtists as Rec)?.items as Array<Rec>) || [];
     if (list.length) {
@@ -341,8 +344,8 @@ async function show(id: string): Promise<Rec> {
   ]) as Array<Rec>;
   const s = meta?.podcastUnionV2 as Rec;
   if (!s) return { error: 'Show not found' };
-  const ev = eps?.podcastUnionV2?.episodesV2 as Rec | undefined;
-  const epItems = ((ev?.items as Array<Rec>) || []).map((i) => {
+  const ev = get<Rec>(get<Rec>(eps, 'podcastUnionV2'), 'episodesV2');
+  const epItems = (get<Array<Rec>>(ev, 'items') || []).map((i) => {
     const e = ((i.data as Rec) || ((i.entity as Rec)?.data as Rec)) as Rec;
     return {
       title: e.name,
@@ -354,6 +357,9 @@ async function show(id: string): Promise<Rec> {
       cover: imgUrl(e.coverArt),
     };
   });
+  const rating = get<Rec>(s, 'rating');
+  const avgRating = get<Rec>(rating, 'averageRating');
+  const contentRating = get<Rec>(s, 'contentRatingV2');
   return {
     type: 'show',
     title: s.name,
@@ -362,11 +368,12 @@ async function show(id: string): Promise<Rec> {
     publisher: s.publisher ? (s.publisher as Rec).name : null,
     description: s.description || s.htmlDescription,
     mediaType: s.mediaType,
-    rating: s.rating && (s.rating as Rec).averageRating ? {
-      average: (s.rating as Rec).averageRating.average,
-      totalRatings: (s.rating as Rec).averageRating.totalRatings,
+    rating: rating && avgRating ? {
+      average: avgRating.average,
+      totalRatings: avgRating.totalRatings,
     } : null,
-    explicit: s.contentRatingV2 && ((s.contentRatingV2 as Rec).labels as string[]).indexOf('EXPLICIT') > -1,
+    // labels is optional inside contentRatingV2; a missing labels list means "not explicit"
+    explicit: contentRating ? get<Array<string>>(contentRating, 'labels')?.includes('EXPLICIT') === true : (contentRating ?? null),
     totalEpisodes: ev ? ev.totalCount : epItems.length,
     episodes: epItems,
   };
@@ -386,14 +393,16 @@ async function episode(id: string): Promise<Rec> {
     duration: duration((e.duration as Rec)?.totalMilliseconds),
     explicit: e.contentRating ? (e.contentRating as Rec).label === 'EXPLICIT' : false,
     show: ((e.podcastV2 as Rec)?.data as Rec)?.name || null,
-    preview: (e.previewPlayback as Rec)?.url || ((e.audio as Rec)?.items?.[0] as Rec)?.url || null,
+    preview: (e.previewPlayback as Rec)?.url || get<Array<Rec>>(get<Rec>(e, 'audio'), 'items')?.[0]?.url || null,
     cover: imgUrl(e.coverArt),
   };
 }
 
 function unwrap(item: unknown): Rec {
   const i = item as Rec;
-  return (i.item?.data) || i.data || i;
+  const nested = get<Rec>(get<Rec>(i, 'item'), 'data');
+  const direct = i.data as Rec | undefined;
+  return nested || direct || i;
 }
 
 function fmtSearchTrack(d: Rec): Rec {
@@ -458,20 +467,29 @@ async function search(query: string, limit: number): Promise<Rec> {
   };
   const data = await graph('searchDesktop', HASH.search, variables) as Rec;
   if (data.error) return data;
-  const sv = data?.searchV2 as Rec | undefined;
+  const sv = get<Rec>(data, 'searchV2');
   if (!sv) return { error: 'No search results' };
   const out: Rec = { query, limit, results: {} };
-  const topList = (get<Rec>(sv, 'topResultsV2')?.featured || get<Rec>(sv, 'topResultsV2')?.itemsV2) as Array<Rec> || [];
+  const topResults = get<Rec>(sv, 'topResultsV2');
+  const topList = (get<Array<Rec>>(topResults, 'featured') || get<Array<Rec>>(topResults, 'itemsV2') || []);
   const results = out.results as Rec;
   if (topList.length) results.topResults = topList.map(unwrap).map(formatSearchAny).filter(Boolean);
-  if (sv.tracksV2) results.tracks = (sv.tracksV2 as Rec).items.map(unwrap).map(fmtSearchTrack);
-  if (sv.artists) results.artists = (sv.artists as Rec).items.map(unwrap).map(fmtSearchArtist);
-  if (sv.albumsV2) results.albums = (sv.albumsV2 as Rec).items.map(unwrap).map(fmtSearchAlbum);
-  if (sv.playlists) results.playlists = (sv.playlists as Rec).items.map(unwrap).map(fmtSearchPlaylist);
-  if (sv.episodes) results.episodes = (sv.episodes as Rec).items.map(unwrap).map(fmtSearchEpisode);
-  if (sv.podcasts) results.podcasts = (sv.podcasts as Rec).items.map(unwrap).map(fmtSearchPodcast);
-  if (sv.genres) results.genres = (sv.genres as Rec).items.map(unwrap).map((g) => ({ type: 'genre', name: g.name, image: imgUrl(g.image) }));
-  if (sv.users) results.users = (sv.users as Rec).items.map(unwrap).map((u) => ({
+  const sections: Array<[string, string, (d: Rec) => Rec]> = [
+    ['tracks', 'tracksV2', fmtSearchTrack],
+    ['artists', 'artists', fmtSearchArtist],
+    ['albums', 'albumsV2', fmtSearchAlbum],
+    ['playlists', 'playlists', fmtSearchPlaylist],
+    ['episodes', 'episodes', fmtSearchEpisode],
+    ['podcasts', 'podcasts', fmtSearchPodcast],
+  ];
+  for (const [outKey, srcKey, fmt] of sections) {
+    const items = get<Array<Rec>>(get<Rec>(sv, srcKey), 'items');
+    if (items) results[outKey] = items.map(unwrap).map(fmt);
+  }
+  const genres = get<Array<Rec>>(get<Rec>(sv, 'genres'), 'items');
+  if (genres) results.genres = genres.map(unwrap).map((g) => ({ type: 'genre', name: g.name, image: imgUrl(g.image) }));
+  const users = get<Array<Rec>>(get<Rec>(sv, 'users'), 'items');
+  if (users) results.users = users.map(unwrap).map((u) => ({
     type: 'user', name: u.displayName || u.name || null, id: u.id || null, uri: u.uri || null, image: imgUrl(u.avatar),
   }));
   return out;
@@ -517,8 +535,9 @@ async function getHome(withDetail: boolean, limit: number): Promise<Rec> {
   const home = ((data.home as Rec)?.data) as Rec | undefined;
   if (!home) return { error: 'Home sections missing' };
 
-  const sections = await mapWithConcurrency((home.sections as Array<Rec>) || [], 3, async (s) => {
-    let items = (s.items as Array<Rec>) || [];
+  const allSections = get<Array<Rec>>(home, 'sections') || [];
+  const sections = await mapWithConcurrency(allSections, 3, async (s) => {
+    let items = get<Array<Rec>>(s, 'items') || [];
     if (limit && items.length > limit) items = items.slice(0, limit);
     if (!withDetail) {
       return {
@@ -528,7 +547,7 @@ async function getHome(withDetail: boolean, limit: number): Promise<Rec> {
       };
     }
     const itemsWithDetail = await mapWithConcurrency(items, 5, async (it) => {
-      const detail = await detailByUri(it.uri);
+      const detail = await detailByUri(String(it.uri));
       return {
         title: it.title, uri: it.uri, id: String(it.uri).split(':').pop(),
         imageUrl: it.imageUrl, detail: detail || null,

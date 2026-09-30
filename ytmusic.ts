@@ -250,7 +250,7 @@ function getSecondarySections(json: unknown): Array<Rec> {
 }
 
 function getShelfItems(sections: Array<Rec>): Array<Rec> {
-  return sections.flatMap((s) => asList(s, 'musicShelfRenderer', 'contents') || asList(s, 'musicPlaylistShelfRenderer', 'contents') || []);
+  return sections.flatMap((s) => asList<Rec>(s, 'musicShelfRenderer', 'contents') || asList<Rec>(s, 'musicPlaylistShelfRenderer', 'contents') || []);
 }
 
 function parseAlbum(json: unknown): Rec {
@@ -316,10 +316,11 @@ function parseArtist(json: unknown, browseId: string): Rec {
     .filter(Boolean);
 
   const descriptionShelf = asRec(sections.find((s) => get(s, 'musicDescriptionShelfRenderer')), 'musicDescriptionShelfRenderer');
-  const name =
-    songs.find((s) => (s.artists as Array<{ id: string }>)?.some((a) => a.id === browseId))?.artists?.find((a) => a.id === browseId)?.name
-    || runsToText(asRuns(descriptionShelf, 'header'))
-    || null;
+  const matchedArtist = songs
+    .map((s) => (s?.artists || []) as Array<{ id: string; name: string }>)
+    .find((artists) => artists.some((a) => a.id === browseId))
+    ?.find((a) => a.id === browseId);
+  const name = matchedArtist?.name || runsToText(asRuns(descriptionShelf, 'header')) || null;
 
   return {
     type: 'artist',
@@ -480,7 +481,7 @@ async function download(videoId: string, depth = 0): Promise<Rec> {
     title: vd.title,
     artist: vd.author || null,
     lengthSeconds: Number(vd.lengthSeconds || 0),
-    thumbnail: (get<Rec>(get<Rec>(vd, 'thumbnail'), 'thumbnails') as Array<{ url: string }>)?.slice(-1)?.[0]?.url || null,
+    thumbnail: asList<{ url: string }>(vd, 'thumbnail', 'thumbnails')?.slice(-1)?.[0]?.url || null,
     expiresInSeconds: sd.expiresInSeconds || null,
     audioFormats: (formats as Array<Rec>).filter((f) => String(f.mimeType).startsWith('audio')).map(parseFormat),
     videoFormats: (formats as Array<Rec>).filter((f) => String(f.mimeType).startsWith('video')).map(parseFormat),

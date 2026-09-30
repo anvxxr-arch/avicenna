@@ -7,6 +7,7 @@
 
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
+import type { AnyNode } from 'domhandler';
 
 declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
 declare const Buffer: { from(data: string, enc?: string): { toString(enc?: string): string } };
@@ -118,7 +119,7 @@ function parsePagination($: CheerioAPI): Rec {
   return result;
 }
 
-function parseCardDetpost($: CheerioAPI, element: unknown): Rec | null {
+function parseCardDetpost($: CheerioAPI, element: AnyNode): Rec | null {
   const $el = $(element);
   const link = $el.find('.thumb a').attr('href');
   const title = $el.find('.jdlflm').text().trim();
@@ -130,7 +131,7 @@ function parseCardDetpost($: CheerioAPI, element: unknown): Rec | null {
   return { title, url: link.startsWith('http') ? link : BASE_URL + link, poster, episode, day, date };
 }
 
-function parseCardColAnime($: CheerioAPI, element: unknown): Rec | null {
+function parseCardColAnime($: CheerioAPI, element: AnyNode): Rec | null {
   const $el = $(element);
   const link = $el.find('.col-anime-title a').attr('href');
   const title = $el.find('.col-anime-title a').text().trim();
@@ -232,7 +233,7 @@ async function getNonce(): Promise<string | null> {
   }
 }
 
-async function getStreamUrl(postId: string | number, index: unknown, quality: unknown, nonce: string): Promise<string | null> {
+async function getStreamUrl(postId: string | number, index: string | number, quality: string | number, nonce: string): Promise<string | null> {
   try {
     const res = await postAjaxRaw({ action: '2a3505c93b0035d3f455df82bf976b84', id: postId, i: index, q: quality, nonce });
     if (!res?.data) return null;
@@ -250,7 +251,7 @@ async function extractStreams(html: string): Promise<Rec> {
   if (!postId) return {};
   const nonce = await getNonce();
   if (!nonce) return {};
-  const streams: Rec = {};
+  const streams: Record<string, { postId: string | number; i: string; q: string; nonce: string }> = {};
   $('.mirrorstream ul').each((_, ul) => {
     const $ul = $(ul);
     $ul.find('a').each((_, a) => {
@@ -261,7 +262,9 @@ async function extractStreams(html: string): Promise<Rec> {
           const decoded = JSON.parse(Buffer.from(dataContent, 'base64').toString('utf-8')) as { id?: string | number; i?: unknown; q?: unknown };
           if (decoded.id === postId) {
             const key = `${decoded.q}_${$a.text().trim()}`;
-            streams[key] = { postId, i: decoded.i, q: decoded.q, nonce };
+            // postAjaxRaw stringifies every payload value anyway, so fold the
+            // untrusted i/q into strings here and keep them out of the typed path.
+            streams[key] = { postId, i: String(decoded.i), q: String(decoded.q), nonce };
           }
         } catch { /* ignore */ }
       }
@@ -269,7 +272,7 @@ async function extractStreams(html: string): Promise<Rec> {
   });
   const result: Rec = {};
   for (const [key, params] of Object.entries(streams)) {
-    const p = params as { postId: string | number; i: unknown; q: unknown; nonce: string };
+    const p = params as { postId: string | number; i: string | number; q: string | number; nonce: string };
     const url = await getStreamUrl(p.postId, p.i, p.q, p.nonce);
     if (url) result[key] = url;
   }

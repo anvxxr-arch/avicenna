@@ -87,11 +87,12 @@ function takeAvatar(avatar: unknown): string | null {
 }
 
 function takeUrl(v: unknown): string | null {
-  const first: unknown = Array.isArray(v) ? v[v.length - 1] : v;
-  if (first && typeof first === 'object' && 'url' in first) {
-    return typeof first.url === 'string' ? first.url : null;
+  if (Array.isArray(v)) {
+    const last: unknown = v.length ? v[v.length - 1] : null;
+    if (last && typeof last === 'object' && 'url' in last && typeof last.url === 'string') return last.url;
+    return null;
   }
-  return typeof first === 'string' ? first : null;
+  return typeof v === 'string' ? v : null;
 }
 function extractVideo(item: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!item) return null;

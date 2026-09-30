@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "cheerio": "^1.2.0"
+    "animejs": "^4.5.0",
+    "cheerio": "^1.2.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.49.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0"
   },
   "scripts": {
     "parity": "bun tools/parity.ts --live",
@@ -27,9 +34,18 @@
     "contract": "bun tools/contract.ts --check",
     "contract:capture": "bun tools/contract.ts --capture",
     "secrets": "bun tools/scan-secrets.ts --all",
-    "golden-diff": "bun tools/golden-diff.ts"
+    "golden-diff": "bun tools/golden-diff.ts",
+    "web:build": "bun web/build.ts",
+    "web:dev": "bun web/build.ts --dev && bun web/serve.ts",
+    "web": "bun web/serve.ts",
+    "typecheck": "bunx tsc --noEmit && bunx tsc --noEmit -p web/tsconfig.json",
+    "check": "bun run typecheck && bun run parity:guards && bun run contract && bun run secrets"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.2"
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "bun-plugin-tailwind": "^0.1.2",
+    "tailwindcss": "^4.3.3"
   }
 }
