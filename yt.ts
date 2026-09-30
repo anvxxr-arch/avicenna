@@ -41,11 +41,10 @@ async function bootstrap(force = false): Promise<Cfg> {
 
 async function youtubei(endpoint: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { key } = await bootstrap();
-  const res = await fetch(`${API}/${endpoint}?key=${key}`, {
+  const res = await site.request(`${API}/${endpoint}?key=${key}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'user-agent': UA, origin: BASE },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(30_000),
   });
   const json = await res.json() as Record<string, unknown> & { error?: { message?: string } };
   if (json.error) throw new Error(json.error.message || 'youtubei error');
@@ -387,11 +386,10 @@ async function download(videoId: string): Promise<Record<string, unknown>> {
     contentCheckOk: true,
     racyCheckOk: true,
   };
-  const res = await fetch(`${API}/player?key=${ANDROID_VR_KEY}`, {
+  const res = await site.request(`${API}/player?key=${ANDROID_VR_KEY}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'user-agent': UA, origin: BASE, 'x-goog-visitor-id': config!.visitorData },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(30_000),
   });
   const json = await res.json() as Record<string, unknown> & { error?: { message?: string } };
   if (json.error) throw new Error(json.error.message || 'youtubei error');

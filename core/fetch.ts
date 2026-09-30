@@ -17,6 +17,20 @@ export interface SiteConfig {
   maxRedirects?: number; // default 5
 }
 
+export interface RequestOptions {
+  /**
+   * Redirect handling: `false`/absent = refuse, `true` = follow (bounded, every
+   * hop re-checked against the allowlist), `'manual'` = validate the Location
+   * host and return the 3xx response untouched.
+   */
+  follow?: boolean | 'manual';
+  /**
+   * Extra hosts a redirect may land on, IN ADDITION to the pinned origin.
+   * Must be listed explicitly — never inferred — so a hostile `Location`
+   * header cannot reach an unlisted (e.g. private/link-local) host.
+   */
+  allowHosts?: string[];
+}
 export interface Site {
   base: string;
   baseHost: string;
@@ -26,6 +40,24 @@ export interface Site {
   resolveUrl(raw: string, base: string): string;
   fetchPage(url: string): Promise<string>;
   postAjax(url: string, body: string, postUrl?: string, extraHeaders?: Record<string, string>): Promise<string>;
+  /**
+   * Guarded single request outside the GET cache — for internal/JSON APIs.
+   * Applies the same origin rules, limiter, retry/backoff, timeout, redirect
+   * bound and size caps as fetchPage, but never caches. `corsSite` widens the
+   * origin pin to a second host on the SAME registrable domain (e.g. an API on
+   * a sibling subdomain); anything else is rejected.
+   */
+  request(
+    url: string | { path: string; corsSite?: boolean },
+    init?: RequestInit & RequestOptions,
+  ): Promise<Response>;
+  /**
+   * Guarded request to an explicitly named PUBLIC third-party host (CDN, embed
+   * origin, upload endpoint). Same guards/limiter/timeout/caps as request(),
+   * but the host is the URL's own origin instead of the site origin. Private,
+   * loopback and link-local targets are rejected; redirects stay on that host.
+   */
+  requestExternal(url: string, init?: RequestInit): Promise<Response>;
   cacheApi: { stats(): { size: number; max: number }; purge(): number };
 }
 
@@ -265,8 +297,83 @@ export function createSite(cfg: SiteConfig): Site {
     })));
   }
 
+  /** Same registrable domain (last two labels) — used for sibling-subdomain APIs. */
+  function sameSiteHost(u: URL): boolean {
+    if (u.hostname.toLowerCase() === baseHost) return true;
+    const reg = (h: string) => h.split('.').slice(-2).join('.');
+    return reg(u.hostname.toLowerCase()) === reg(baseHost);
+  }
+  async function request(url: string | { path: string; corsSite?: boolean }, init?: RequestInit): Promise<Response> {
+    const raw = typeof url === 'string' ? url : url.path;
+    const corsSite = typeof url === 'string' ? false : !!url.corsSite;
+    let target: URL;
+    try {
+      target = new URL(raw, base + '/');
+    } catch {
+      throw new Error('Invalid request URL');
+    }
+    if (target.protocol !== 'https:' && target.protocol !== 'http:') throw new Error('Blocked URL scheme');
+    if (target.username || target.password) throw new Error('Creds in URL blocked');
+    if (isBlockedHost(target.hostname)) throw new Error('Blocked host');
+    if (target.hostname.toLowerCase() !== baseHost && !(corsSite && sameSiteHost(target))) {
+      throw new Error(`External host rejected: ${target.hostname}`);
+    }
+    const href = target.toString();
+    const follow = !!(init as RequestOptions | undefined)?.follow;
+    const extraHosts = ((init as RequestOptions | undefined)?.allowHosts ?? []).map((h) => h.toLowerCase());
+    const allowedHost = (h: string) => h === baseHost || (corsSite && sameSiteHost(new URL(`https://${h}/`))) || extraHosts.includes(h);
+    // Non-2xx is returned to the caller: these are internal/JSON APIs whose
+    // error bodies are part of their contract. Guards + limiter + timeout apply
+    // to every hop; redirects are followed manually, never by the platform.
+    return limiter.run(async () => {
+      let cur = href;
+      for (let hop = 0; ; hop++) {
+        const ctrl = AbortSignal.timeout(TIMEOUT_MS);
+        let res: Response;
+        try {
+          res = await fetch(cur, { ...init, redirect: 'manual', signal: ctrl });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes('aborted') || msg.toLowerCase().includes('timeout')) throw new Error(`Timeout ${TIMEOUT_MS}ms for ${cur}`);
+          throw e;
+        }
+        if (!(res.status >= 300 && res.status < 400)) return res;
+        const loc = res.headers.get('location');
+        if (!follow) {
+          await res.body?.cancel().catch(() => {});
+          throw new Error(`Redirect ${res.status} not allowed for ${cur}`);
+        }
+        if (!loc) { await res.body?.cancel().catch(() => {}); throw new Error(`Redirect ${res.status} without location`); }
+        const next = new URL(loc, cur);
+        if (next.protocol !== 'https:' && next.protocol !== 'http:') { await res.body?.cancel().catch(() => {}); throw new Error('Bad redirect scheme'); }
+        if (next.username || next.password) { await res.body?.cancel().catch(() => {}); throw new Error('Creds in URL blocked'); }
+        if (isBlockedHost(next.hostname)) { await res.body?.cancel().catch(() => {}); throw new Error(`Blocked redirect host: ${next.hostname}`); }
+        if (!allowedHost(next.hostname.toLowerCase())) { await res.body?.cancel().catch(() => {}); throw new Error(`Redirect host not allowed: ${next.hostname}`); }
+        if (follow === 'manual') return res;
+        await res.body?.cancel().catch(() => {});
+        if (hop + 1 > MAX_REDIRECTS) throw new Error('Too many redirects');
+        cur = next.toString();
+      }
+    });
+  }
+  // Child sites for explicitly named public hosts (CDN/embed/upload endpoints).
+  const externalSites = new Map<string, Site>();
+  async function requestExternal(rawUrl: string, init?: RequestInit): Promise<Response> {
+    let u: URL;
+    try { u = new URL(rawUrl); } catch { throw new Error('Invalid URL'); }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('Blocked URL scheme');
+    if (u.username || u.password) throw new Error('Creds in URL blocked');
+    if (isBlockedHost(u.hostname)) throw new Error(`Blocked host: ${u.hostname}`);
+    const origin = u.origin;
+    let child = externalSites.get(origin);
+    if (!child) {
+      child = createSite({ base: origin, rateMs: cfg.rateMs, headers: cfg.headers, timeoutMs: cfg.timeoutMs, maxBytes: cfg.maxBytes, maxRedirects: MAX_REDIRECTS });
+      externalSites.set(origin, child);
+    }
+    return child.request(u.toString(), { ...init, follow: true });
+  }
   return {
-    base, baseHost, isValidUrl, assertSiteUrl, sanitizeUrl, resolveUrl, fetchPage, postAjax,
+    base, baseHost, isValidUrl, assertSiteUrl, sanitizeUrl, resolveUrl, fetchPage, postAjax, request, requestExternal,
     cacheApi: {
       stats(): { size: number; max: number } {
         const now = Date.now();

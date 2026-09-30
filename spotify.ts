@@ -83,9 +83,9 @@ async function graph(op: string, hash: string, variables: Record<string, unknown
   const path = '/pathfinder/v1/query?operationName=' + op +
     '&variables=' + encodeURIComponent(JSON.stringify(variables)) +
     '&extensions=' + encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: hash } }));
-  const res = await fetch('https://api-partner.spotify.com' + path, {
+  // api-partner.spotify.com is a sibling subdomain of the pinned origin
+  const res = await site.request({ path: 'https://api-partner.spotify.com' + path, corsSite: true }, {
     headers: { authorization: 'Bearer ' + token, 'user-agent': UA },
-    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) return { error: op + ' failed: ' + res.status };
   const data = await res.json() as Rec & { errors?: Array<{ message: string }> };

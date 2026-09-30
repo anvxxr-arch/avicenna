@@ -45,15 +45,17 @@ function getHeaders(): Record<string, string> {
 }
 
 async function fetchHTML(rawUrl: string): Promise<string> {
-  // every request is origin-pinned; also trims the UTF-8 BOM some pages prepend
+  // origin-pinned (site host only); also trims the UTF-8 BOM some pages prepend
   const url = site.sanitizeUrl(rawUrl);
-  const res = await fetch(url, {
-    headers: getHeaders(),
-    redirect: 'follow',
-    signal: AbortSignal.timeout(30_000),
-  });
+  const res = await site.request(url, { headers: getHeaders() });
   jar.update(res);
   if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${url}`);
+  return (await res.text()).replace(/^\uFEFF/, '');
+}
+/** Embed/proxy hosts are third-party by nature (play.<x>, video nodes). */
+async function fetchPublic(rawUrl: string): Promise<string> {
+  const res = await site.requestExternal(rawUrl, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${rawUrl}`);
   return (await res.text()).replace(/^\uFEFF/, '');
 }
 
@@ -235,7 +237,7 @@ function extractVideoUrls($: CheerioAPI): Rec {
 async function fetchDirectVideo(proxyUrl: string, depth = 0): Promise<string | null> {
   if (depth > 5) return null;
   try {
-    const html = await fetchHTML(proxyUrl);
+    const html = await fetchPublic(proxyUrl);
     const $ = cheerio.load(html);
     const iframe = $('iframe').attr('src');
     if (iframe) {

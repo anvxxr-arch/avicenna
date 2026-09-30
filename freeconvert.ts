@@ -71,11 +71,10 @@ async function uploadFile(job: Job, token: string, file: string): Promise<unknow
   const fd = new FormData();
   fd.append('signature', form.parameters.signature);
   fd.append('file', new Blob([fs.readFileSync(file)], { type: 'video/mp4' }), path.basename(file));
-  const res = await fetch(form.url, {
+  const res = await site.requestExternal(form.url, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}` },
     body: fd,
-    signal: AbortSignal.timeout(120_000),
   });
   if (!res.ok) throw new Error(`upload HTTP ${res.status}`);
   return res.json();
@@ -83,11 +82,9 @@ async function uploadFile(job: Job, token: string, file: string): Promise<unknow
 
 async function waitDone(id: string, token: string): Promise<Job> {
   for (let i = 0; i < 120; i++) {
-    // authenticated GET — fetchPage has no auth, use direct fetch with guards
-    if (!isValidUrl(`${API}/process/jobs/${id}`)) throw new Error('job URL blocked');
-    const res = await fetch(`${API}/process/jobs/${id}`, {
+    // authenticated GET through the hardened core (no cache, guards intact)
+    const res = await site.request(`${API}/process/jobs/${id}`, {
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
-      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`job poll HTTP ${res.status}`);
     const job = (await res.json()) as Job;
@@ -102,7 +99,7 @@ async function waitDone(id: string, token: string): Promise<Job> {
 async function download(url: string, dir = 'downloads'): Promise<{ file: string; url: string; md5: string; bytes: number }> {
   if (!isValidUrl(url)) throw new Error('download URL blocked by guards');
   fs.mkdirSync(dir, { recursive: true });
-  const res = await fetch(url, { signal: AbortSignal.timeout(300_000) });
+  const res = await site.requestExternal(url, {});
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const buf = Buffer.from(await res.arrayBuffer());
   const md5 = createHash('md5').update(buf).digest('hex');

@@ -45,7 +45,7 @@ async function post(endpoint: string, body: Record<string, unknown>): Promise<Re
     },
     ...body,
   };
-  const res = await fetch(`${API}/${endpoint}?key=${API_KEY}&prettyPrint=false`, {
+  const res = await site.request(`${API}/${endpoint}?key=${API_KEY}&prettyPrint=false`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -56,7 +56,6 @@ async function post(endpoint: string, body: Record<string, unknown>): Promise<Re
       'referer': BASE + '/',
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json() as Promise<Record<string, unknown>>;
@@ -404,7 +403,7 @@ async function getSignatureTimestamp(): Promise<number> {
   const html = await fetchPage(BASE + '/');
   const playerJs = html.match(/\/s\/player\/[^"']*base\.js/)?.[0];
   if (!playerJs) throw new Error('Unable to locate player script');
-  const res = await fetch(BASE + playerJs, { headers: { 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(30_000) });
+  const res = await site.request(BASE + playerJs, { headers: { 'user-agent': USER_AGENT } });
   const js = await res.text();
   cachedSignatureTimestamp = Number(js.match(/signatureTimestamp:(\d+)/)?.[1] || 0);
   return cachedSignatureTimestamp;

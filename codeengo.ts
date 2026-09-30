@@ -56,8 +56,8 @@ async function generate(prompt: string): Promise<Record<string, unknown>> {
 
   const form = new FormData();
   form.append('files[]', new Blob([buffer]), filename);
-  // uguu.se is a third-party upload service (off-origin by design) — not site traffic
-  const upload = await fetch(UGUU, { method: 'POST', body: form, signal: AbortSignal.timeout(60_000) });
+  // uguu.se is a third-party upload service — explicit external host, still guarded
+  const upload = await site.requestExternal(UGUU, { method: 'POST', body: form });
   const uploaded = (await upload.json()) as { files?: Array<{ url?: string }> };
   const url = uploaded?.files?.[0]?.url || null;
 

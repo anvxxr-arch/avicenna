@@ -24,12 +24,10 @@ const { fetchPage } = site;
 interface SignupResp { idToken?: string; error?: { message?: string } }
 
 async function signupIdToken(): Promise<string> {
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_KEY}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ returnSecureToken: true, tenantId: 'sakana-talk-prd-pvl72' }),
-    signal: AbortSignal.timeout(30_000),
-  });
+  const res = await site.requestExternal(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_KEY}`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true, tenantId: 'sakana-talk-prd-pvl72' }) },
+  );
   const data = (await res.json()) as SignupResp;
   if (!data.idToken) {
     throw new Error(`Firebase signup failed: ${data.error?.message || res.status} (is SAKANA_FIREBASE_KEY valid?)`);
@@ -38,7 +36,7 @@ async function signupIdToken(): Promise<string> {
 }
 
 async function loginCookie(idToken: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/auth/login`, {
+  const res = await site.request(`${BASE}/api/auth/login`, {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
@@ -62,10 +60,7 @@ async function getCookie(): Promise<string> {
 
 async function getModels(): Promise<string[]> {
   const cookie = await getCookie();
-  const res = await fetch(`${BASE}/api/agents`, {
-    headers: { cookie },
-    signal: AbortSignal.timeout(30_000),
-  });
+  const res = await site.request(`${BASE}/api/agents`, { headers: { cookie } });
   if (!res.ok) throw new Error(`agents HTTP ${res.status}`);
   const data = (await res.json()) as Array<{ id: string }>;
   return data.map((a) => a.id);
@@ -73,13 +68,13 @@ async function getModels(): Promise<string[]> {
 
 async function getConversations(limit = 20): Promise<unknown[]> {
   const cookie = await getCookie();
-  const res = await fetch(`${BASE}/api/conversations?limit=${limit}`, { headers: { cookie }, signal: AbortSignal.timeout(30_000) });
+  const res = await site.request(`${BASE}/api/conversations?limit=${limit}`, { headers: { cookie } });
   if (!res.ok) throw new Error(`conversations HTTP ${res.status}`);
   return (await res.json()) as unknown[];
 }
 async function deleteConversation(id: string): Promise<unknown> {
   const cookie = await getCookie();
-  const res = await fetch(`${BASE}/conversation/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { cookie, origin: BASE }, signal: AbortSignal.timeout(30_000) });
+  const res = await site.request(`${BASE}/conversation/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { cookie, origin: BASE } });
   if (!res.ok) throw new Error(`delete HTTP ${res.status}`);
   return await res.json().catch(() => null);
 }
@@ -121,7 +116,7 @@ async function chat(question: string, opts: {
   let parentId = parentMessageId;
 
   if (!convId) {
-    const res = await fetch(`${BASE}/conversation`, {
+    const res = await site.request(`${BASE}/conversation`, {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json', origin: BASE, referer: BASE },
       body: JSON.stringify({
@@ -150,7 +145,7 @@ async function chat(question: string, opts: {
     userMessageId: randomUUID(),
   });
 
-  const res = await fetch(`${BASE}/conversation/${convId}`, {
+  const res = await site.request(`${BASE}/conversation/${convId}`, {
     method: 'POST',
     headers: {
       cookie,

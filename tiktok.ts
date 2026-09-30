@@ -41,8 +41,9 @@ function grabCookies(res: Response): string {
   return parts.join('; ');
 }
 
-async function fetchTikTokPage(url: string): Promise<{ cookies: string; html: string }> {
-  const res = await fetch(url, {
+async function fetchTikTokPage(rawUrl: string): Promise<{ cookies: string; html: string }> {
+  // pinned to the site origin; a hostile redirect cannot leave tiktok.com
+  const res = await site.request(site.assertSiteUrl(rawUrl), {
     headers: {
       'user-agent': UA_MOBILE,
       'accept-language': 'id-ID,id;q=0.9,en;q=0.8',
@@ -50,8 +51,7 @@ async function fetchTikTokPage(url: string): Promise<{ cookies: string; html: st
       'referer': BASE_URL + '/',
       'cookie': `tt_webid_v2=${webId}; ttwid=${webId}; msToken=${'x'.repeat(107)}`,
     },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(25_000),
+    follow: true,
   });
   const cookies = grabCookies(res);
   const html = await res.text();
@@ -139,14 +139,16 @@ function extractIdFromUrl(url: string): string | null {
 
 async function resolveShortLink(url: string): Promise<string> {
   if (!/vm\.tiktok\.com|vt\.tiktok\.com/.test(url)) return url;
-  const res = await fetch(url, {
+  // vm./vt. hosts redirect to www.tiktok.com — validate the hop host explicitly
+  const res = await site.request({ path: url, corsSite: true }, {
     method: 'GET',
-    redirect: 'manual',
-    headers: { 'user-agent': UA_MOBILE },
-    signal: AbortSignal.timeout(20_000),
+    follow: 'manual',
+    headers: { 'user-agent': UA_MOBILE, accept: '*/*' },
   });
   await res.body?.cancel().catch(() => {});
-  return res.headers.get('location') || url;
+  const loc = res.headers.get('location');
+  if (!loc || !isValidUrl(loc)) return url;
+  return loc;
 }
 
 function findItemStruct(obj: unknown, depth = 0): Record<string, unknown> | null {
@@ -238,15 +240,14 @@ async function downloadVideo(url: string, nama?: string): Promise<{ file: string
   const dir = path.dirname(file);
   if (dir !== '.' && !existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-  const res = await fetch(noWm, {
+  // CDN download: guarded external host (validated above), redirects stay on it
+  const res = await site.requestExternal(noWm, {
     headers: {
       'user-agent': UA_MOBILE,
       'referer': (info.pageUrl as string) || BASE_URL + '/',
       'cookie': (info.sessionCookies as string) || '',
       'accept': 'video/mp4,*/*',
     },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`download HTTP ${res.status}`);
   const writer = createWriteStream(file);

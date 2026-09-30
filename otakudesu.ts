@@ -43,24 +43,32 @@ function getHeaders(): Record<string, string> {
   };
 }
 
-async function fetchHTML(url: string): Promise<string> {
-  const res = await fetch(url, { headers: getHeaders(), redirect: 'follow', signal: AbortSignal.timeout(30_000) });
+async function fetchHTML(rawUrl: string): Promise<string> {
+  // origin-pinned (core assertSiteUrl) + limiter + timeout + redirect-host checks
+  const url = site.assertSiteUrl(rawUrl);
+  const res = await site.request(url, { headers: getHeaders() });
   jar.update(res);
   if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${url}`);
-  return res.text();
+  const body = (await res.text()).replace(/^\uFEFF/, '');
+  // the site can start answering with a core/destination error page; a silent
+  // empty result would hide that, so name it here
+  if (/kesalahan|class="error-404|Tidak ditemukan/i.test(body) && !/mirrorstream|detpost|jdlrx/.test(body)) {
+    throw new Error('otakudesu mengembalikan halaman error (kemungkinan rate-limit/block) — coba lagi nanti');
+  }
+  return body;
 }
 
-/** admin-ajax POST with cookie jar (form-encoded) */
+/** admin-ajax POST through the hardened core (origin-pinned, throttled, timeout). */
 async function postAjaxRaw(payload: Record<string, string | number>): Promise<Rec> {
-  const res = await fetch(`${BASE_URL}/wp-admin/admin-ajax.php`, {
+  const body = new URLSearchParams(Object.entries(payload).map(([k, v]) => [k, String(v)])).toString();
+  const res = await site.request(`${BASE_URL}/wp-admin/admin-ajax.php`, {
     method: 'POST',
     headers: {
       ...getHeaders(),
       'x-requested-with': 'XMLHttpRequest',
-      'content-type': 'application/x-www-form-urlencoded',
+      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
     },
-    body: new URLSearchParams(Object.entries(payload).map(([k, v]) => [k, String(v)])).toString(),
-    signal: AbortSignal.timeout(30_000),
+    body,
   });
   jar.update(res);
   if (!res.ok) throw new Error(`HTTP ${res.status} untuk admin-ajax`);

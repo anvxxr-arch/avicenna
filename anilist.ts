@@ -81,7 +81,7 @@ async function anilistSearch(query: string): Promise<Array<{ title: string; imag
 
 async function translate(text: string, lang = 'id'): Promise<{ status: boolean; result: { tr: string } }> {
   try {
-    const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`);
+    const res = await site.requestExternal(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`, {});
     const data = await res.json() as unknown[];
     const hasil = (data?.[0] as unknown[])?.[0] as unknown[];
     return { status: true, result: { tr: String(hasil?.[0] ?? text) } };
@@ -104,17 +104,17 @@ async function anilistDetail(url: string): Promise<Record<string, unknown>> {
 
     const dataSet = (label: string) => cleanText($(`div.data-set:contains("${label}") .value`).text());
     const listIn = (label: string) => $(`div.data-set:contains("${label}") .value a`).map((_, el) => cleanText($(el).text())).get();
-
+    // translate each title once, in parallel (previously fetched twice each)
+    const romaji = cleanText($('.content h1').first().text());
+    const english = dataSet('English');
+    const native = dataSet('Native');
+    const [romajiTr, englishTr, nativeTr] = await Promise.all([safeTranslate(romaji), safeTranslate(english), safeTranslate(native)]);
     return {
       title: {
-        romaji: cleanText($('.content h1').first().text()),
-        english: dataSet('English'),
-        native: dataSet('Native'),
-        translated: {
-          romaji: await safeTranslate(cleanText($('.content h1').first().text())),
-          english: await safeTranslate(dataSet('English')),
-          native: await safeTranslate(dataSet('Native')),
-        },
+        romaji,
+        english,
+        native,
+        translated: { romaji: romajiTr, english: englishTr, native: nativeTr },
       },
       description: {
         original: descriptionText,
