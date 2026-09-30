@@ -319,7 +319,7 @@ export function createSite(cfg: SiteConfig): Site {
       throw new Error(`External host rejected: ${target.hostname}`);
     }
     const href = target.toString();
-    const follow = !!(init as RequestOptions | undefined)?.follow;
+    const follow = (init as RequestOptions | undefined)?.follow ?? false;
     const extraHosts = ((init as RequestOptions | undefined)?.allowHosts ?? []).map((h) => h.toLowerCase());
     const allowedHost = (h: string) => h === baseHost || (corsSite && sameSiteHost(new URL(`https://${h}/`))) || extraHosts.includes(h);
     // Non-2xx is returned to the caller: these are internal/JSON APIs whose

@@ -34,7 +34,7 @@ declare const Bun: {
 };
 
 const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3000') || 3000;
-const HOST = process.env.API_HOST || '0.0.0.0';
+const HOST = process.env.API_HOST || process.env.HOST || '127.0.0.1';
 const CORS = (process.env.API_CORS ?? '1') === '1';
 const ADMIN_TOKEN = process.env.API_ADMIN_TOKEN || '';
 const STARTED = Date.now();
@@ -65,7 +65,7 @@ function json(data: unknown, status = 200, cacheable: number | null = TTL_SHORT,
 
 function err(e: unknown): Response {
   const msg = e instanceof Error ? e.message : String(e);
-  if (/required|invalid|unknown|too short|must be|year required/i.test(msg)) {
+  if (/required|invalid|unknown|too short|must be|year required|not allowed|blocked|rejected|Illegal chars|scheme/i.test(msg)) {
     return json({ error: msg }, 400, null);
   }
   if (/WAF blocked|HTTP (403|429|5\d\d)/i.test(msg)) {
@@ -136,7 +136,8 @@ const R: Record<string, Handler> = {
     await resolveServer(need(u.searchParams.get('url'), 'Episode URL required (?url=)'), u.searchParams.get('server') || 1),
     200, null,
   ),
-  '/api/nontonanime/servers': async (u) => json(await getEpisodeServers(need(u.searchParams.get('url'), 'Episode URL required (?url=)'))),
+  // nonce-bearing (player_ajax): never cache at origin or edge
+  '/api/nontonanime/servers': async (u) => json(await getEpisodeServers(need(u.searchParams.get('url'), 'Episode URL required (?url=)')), 200, null),
   '/api/nontonanime/nav': async (u) => json(await getEpisodeNav(need(u.searchParams.get('url'), 'Episode URL required (?url=)'))),
   '/api/nontonanime/meta': async (u) => json(await getEpisodeMeta(need(u.searchParams.get('url'), 'Episode URL required (?url=)')), 200, TTL_LONG),
 
@@ -153,10 +154,11 @@ const R: Record<string, Handler> = {
     const yearRaw = need(u.searchParams.get('year'), 'Year required (?season=winter&year=2024)');
     return json(await getSeasonAnime(season, parseInt(yearRaw), pg(u.searchParams.get('page'))), 200, TTL_LONG);
   },
+  // nonce-derived (loadmore AJAX): never cache
   '/api/nontonanime/more': async (u) => {
     const ids = (u.searchParams.get('ids') || '').split(',').map(Number).filter(Number.isFinite);
     const offset = parseInt(u.searchParams.get('offset') || '0') || 0;
-    return json(await loadMoreHome(ids, offset));
+    return json(await loadMoreHome(ids, offset), 200, null);
   },
 };
 
@@ -188,8 +190,10 @@ const server = Bun.serve({
     if (u.pathname === '/api/nontonanime/admin/purge') {
       if (!ADMIN_TOKEN) return json({ error: 'Not found', routes: '/api/nontonanime' }, 404, null);
       if (req.method !== 'POST') return json({ error: 'POST only' }, 405, null);
+      // token only via the Authorization header — a query-string token leaks into
+      // access logs, browser history and any intermediate proxy.
       const auth = req.headers.get('authorization') || '';
-      const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : u.searchParams.get('token') || '';
+      const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : '';
       if (!supplied || !timingSafeEq(supplied, ADMIN_TOKEN)) {
         return json({ error: 'Unauthorized' }, 401, null);
       }

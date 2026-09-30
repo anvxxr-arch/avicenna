@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-declare const process: { env: Record<string, string | undefined>; argv: string[]; exit(code?: number): void };
+declare const process: { env: Record<string, string | undefined>; argv: string[]; stdout: { write(s: string): void }; exit(code?: number): void };
 
 import { defineCli } from './core/cli';
 import { createSite } from './core/fetch';

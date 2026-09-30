@@ -28,7 +28,7 @@ function shape(v: Json): string {
 
 /** A golden file counts only when it parses to a non-empty JSON value. */
 function readGolden(path: string): Json {
-  let raw: string;
+  let raw = '';
   try {
     raw = readFileSync(path, 'utf8');
   } catch (e) {
