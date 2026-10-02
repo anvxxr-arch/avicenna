@@ -28,10 +28,14 @@ interface Case {
   /** free-form note (e.g. why a command is expected to fail) */
   note?: string;
   /**
-   * Live lists that mix item kinds (YouTube's related rail returns videos AND
-   * playlists in one response) make an array-union shape genuinely variable, so
-   * an exact union-size match is flaky. With this flag every variant recorded in
-   * the golden must still appear — new variants are allowed, lost ones are not.
+   * Live lists that mix item kinds (YouTube's search/related rails return videos,
+   * shorts, playlists, mixes and channels in one response) make an array-union
+   * shape genuinely variable, so an exact union match is flaky. With this flag
+   * every variant recorded in the golden must still appear — at any depth — while
+   * new variants are allowed: these rails genuinely add kinds between runs, and
+   * the rare ones (measured at 5–25% of runs) are sampling noise, not drift.
+   * Capture intersects its samples so the golden records only kinds seen in every
+   * one, which is exactly the set the check can require without flaking.
    */
   allowVariants?: boolean;
 }
@@ -75,25 +79,107 @@ function shapeOf(v: unknown): unknown {
   return typeof v;
 }
 
+/** True when a shape node is an object shape: a list of `{key, value}` entries. */
+function isKeyMap(s: unknown): boolean {
+  return (
+    Array.isArray(s) &&
+    s.every((e) => e !== null && typeof e === 'object' && !Array.isArray(e) && 'key' in e && 'value' in e)
+  );
+}
+
 /**
- * Variant-tolerant containment: every shape recorded in the golden must still be
- * present in the live payload (recursively). Only unions may grow.
+ * The identity of one variant in a list: its key set for an object, else its
+ * JSON. Item kinds are told apart by their keys — never by whether a single
+ * field happened to come back null in this particular response.
  */
-/** Merge two shapes, unioning array variants (see allowVariants). */
-function mergeShapes(a: unknown, b: unknown): unknown {
-  if (JSON.stringify(a) === JSON.stringify(b)) return a;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    const out = [...a];
-    for (const el of b) if (!out.some((x) => JSON.stringify(x) === JSON.stringify(el))) out.push(el);
-    return out.sort((x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1));
-  }
+function kindOf(s: unknown): string {
+  return isKeyMap(s)
+    ? (s as Array<{ key: string }>).map((e) => e.key).sort().join(',')
+    : JSON.stringify(s);
+}
+
+/** Merge two scalar type names. `null` means "absent", so it yields to a type. */
+function mergeScalar(a: string, b: string): string {
+  if (a === b) return a;
+  if (a === 'null') return b;
+  if (b === 'null') return a;
   return a;
 }
-function shapeWithin(allowed: unknown, actual: unknown): boolean {
-  if (Array.isArray(allowed) && Array.isArray(actual)) {
-    return actual.every((a) => allowed.some((g) => shapeWithin(g, a)));
+
+/**
+ * Intersect two shapes, keeping only what BOTH agree on. Capture uses this for
+ * variant cases: a kind that shows up in one sample but not the next is not a
+ * kind the check may require.
+ */
+function intersectShapes(a: unknown, b: unknown): unknown {
+  if (JSON.stringify(a) === JSON.stringify(b)) return a;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (isKeyMap(a) && isKeyMap(b)) {
+      const out: unknown[] = [];
+      for (const ea of a as Array<{ key: string; value: unknown }>) {
+        const eb = (b as Array<{ key: string; value: unknown }>).find((x) => x.key === ea.key);
+        if (eb) out.push({ key: ea.key, value: intersectShapes(ea.value, eb.value) });
+      }
+      return out;
+    }
+    // a variant list: keep the kinds present in both samples, intersected
+    const out: unknown[] = [];
+    for (const x of a as unknown[]) {
+      const y = (b as unknown[]).find((c) => kindOf(c) === kindOf(x));
+      if (y) out.push(intersectShapes(x, y));
+    }
+    return out;
   }
-  return JSON.stringify(allowed) === JSON.stringify(actual);
+  if (typeof a === 'string' && typeof b === 'string') return mergeScalar(a, b);
+  return a; // the samples disagree on the shape kind: keep the first
+}
+
+/**
+ * shapeOf renders an empty array as the single sentinel element `'<empty>'`, so
+ * a length check is not enough to tell "no items" from "one odd item".
+ */
+function isEmptyShape(s: unknown): boolean {
+  return Array.isArray(s) && s.length === 1 && s[0] === '<empty>';
+}
+
+/**
+ * Variant-tolerant containment (see Case.allowVariants): every shape recorded in
+ * the golden must still appear in the live payload — at ANY depth, so a nested
+ * `results` union is compared kind-by-kind instead of as one blob. A golden
+ * variant is matched by its key set (its kind) and then recursively, never by a
+ * richer variant that merely happens to contain the same keys — otherwise a lost
+ * kind would go unnoticed because videos also have an `id` and a `title`. New
+ * variants are allowed; a recorded one going missing is drift.
+ *
+ * `null` counts as absent and matches any type: a shorts item with no thumbnail
+ * (about one run in ten) is not shape drift.
+ *
+ * Returns null when the golden is contained, else a one-line description of the
+ * first gap — the old boolean gave the caller nothing to debug with.
+ */
+function variantGap(golden: unknown, live: unknown, path = '$'): string | null {
+  if (Array.isArray(golden) && Array.isArray(live)) {
+    if (isKeyMap(golden) && isKeyMap(live)) {
+      for (const g of golden as Array<{ key: string; value: unknown }>) {
+        const l = (live as Array<{ key: string; value: unknown }>).find((x) => x.key === g.key);
+        if (!l) return `${path}.${g.key}: key missing from live`;
+        const d = variantGap(g.value, l.value, `${path}.${g.key}`);
+        if (d) return d;
+      }
+      return null;
+    }
+    if (isEmptyShape(live)) return null; // no items this response — no shape evidence, not drift
+    for (const g of golden as unknown[]) {
+      const k = kindOf(g);
+      const match = (live as unknown[]).find((l) => kindOf(l) === k);
+      if (!match) return `${path}: kind '${k}' missing — live has ${live.map(kindOf).join(' | ')}`;
+      const d = variantGap(g, match, `${path}[${k}]`);
+      if (d) return d;
+    }
+    return null;
+  }
+  if (golden === live || golden === 'null' || live === 'null') return null;
+  return `${path}: ${JSON.stringify(golden)} -> ${JSON.stringify(live)}`;
 }
 function diffShape(a: unknown, b: unknown, path = '$'): string | null {
   const ja = JSON.stringify(a);
@@ -106,18 +192,20 @@ function diffShape(a: unknown, b: unknown, path = '$'): string | null {
       const d = diffShape(a[i], b[i], `${path}[${i}]`);
       if (d) return d;
     }
-    return `${path}: array shape differs`;
+    return null; // every element matched once null-tolerant differences are allowed
   }
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
     const oa = a as Record<string, unknown>;
     const ob = b as Record<string, unknown>;
-    const ka = Object.keys(oa);
-    for (const k of ka) {
+    for (const k of Object.keys(oa)) {
+      if (!(k in ob)) return `${path}.${k}: key missing from live`;
       const d = diffShape(oa[k], ob[k], `${path}.${k}`);
       if (d) return d;
     }
-    return `${path}: key set differs (${ka.join(',')} vs ${Object.keys(ob).join(',')})`;
+    for (const k of Object.keys(ob)) if (!(k in oa)) return `${path}.${k}: unexpected key in live`;
+    return null; // key sets agree; only null-tolerant differences remained
   }
+  if (a === 'null' || b === 'null') return null; // absent in this response, not drift
   return `${path}: ${ja?.slice(0, 60)} -> ${jb?.slice(0, 60)}`;
 }
 
@@ -271,13 +359,18 @@ async function capture(scraper: string): Promise<Contract> {
       const variant = VARIANT_CASES.has(`${scraper} ${args[0]}`);
       let shape = shapeOf(parsed);
       if (variant) {
-        // the rail mixes videos and playlists across requests: sample a few times
-        // and merge, so the golden records every shape the contract allows.
-        for (let i = 0; i < 4; i++) {
+        // These rails mix item kinds across requests, and the rare kinds come and
+        // go between runs — measured on `yt search`: video/mix/short in 20/20 runs
+        // but the playlist kind in 1/20; on `yt related`: video 20/20, playlist
+        // 5/20, mix 2/20. INTERSECT the samples so the golden records only the
+        // kinds present in EVERY sample. That is the set the check can require
+        // without flaking; a kind recorded from a single lucky sighting would fail
+        // every run that happened not to include it.
+        for (let i = 0; i < 7; i++) {
           const again = await run(scraper, args);
           if (again.exit !== 0) continue;
           try {
-            shape = mergeShapes(shape, shapeOf(JSON.parse(again.stdout)));
+            shape = intersectShapes(shape, shapeOf(JSON.parse(again.stdout)));
           } catch { /* non-JSON help text: ignore */ }
         }
       }
@@ -310,9 +403,7 @@ async function check(scraper: string, contract: Contract): Promise<string[]> {
         else { fails.push(`${label}: stdout is neither JSON nor help text`); continue; }
       }
       const spotted = shapeOf(parsed);
-      const d = c.allowVariants
-        ? (shapeWithin(c.shape, spotted) ? null : 'unrecorded shape variant')
-        : diffShape(c.shape, spotted);
+      const d = c.allowVariants ? variantGap(c.shape, spotted) : diffShape(c.shape, spotted);
       if (d) fails.push(`${label}: shape drift ${d}`);
     } else if (c.errorRe && !new RegExp(c.errorRe, 'i').test(r.stderr)) {
       fails.push(`${label}: stderr does not match /${c.errorRe}/`);

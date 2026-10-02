@@ -1,6 +1,6 @@
 {
   "scraper": "yt",
-  "capturedAt": "2026-09-30T03:11:40.988Z",
+  "capturedAt": "2026-10-02T14:25:22.785Z",
   "cases": [
     {
       "args": [
@@ -73,55 +73,6 @@
               },
               {
                 "key": "videoCount",
-                "value": "string"
-              }
-            ],
-            [
-              {
-                "key": "id",
-                "value": "string"
-              },
-              {
-                "key": "thumbnail",
-                "value": "string"
-              },
-              {
-                "key": "title",
-                "value": "string"
-              },
-              {
-                "key": "type",
-                "value": "string"
-              }
-            ]
-          ]
-        },
-        {
-          "key": "results",
-          "value": [
-            [
-              {
-                "key": "channel",
-                "value": "string"
-              },
-              {
-                "key": "id",
-                "value": "string"
-              },
-              {
-                "key": "thumbnail",
-                "value": "string"
-              },
-              {
-                "key": "title",
-                "value": "string"
-              },
-              {
-                "key": "type",
-                "value": "string"
-              },
-              {
-                "key": "views",
                 "value": "string"
               }
             ],

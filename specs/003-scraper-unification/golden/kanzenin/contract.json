@@ -1,6 +1,6 @@
 {
   "scraper": "kanzenin",
-  "capturedAt": "2026-09-30T18:50:40.729Z",
+  "capturedAt": "2026-10-02T13:25:19.298Z",
   "cases": [
     {
       "args": [
@@ -38,36 +38,6 @@
                       [
                         {
                           "key": "colored",
-                          "value": "boolean"
-                        },
-                        {
-                          "key": "image",
-                          "value": "string"
-                        },
-                        {
-                          "key": "latest",
-                          "value": "string"
-                        },
-                        {
-                          "key": "score",
-                          "value": "string"
-                        },
-                        {
-                          "key": "title",
-                          "value": "string"
-                        },
-                        {
-                          "key": "type",
-                          "value": "string"
-                        },
-                        {
-                          "key": "url",
-                          "value": "string"
-                        }
-                      ],
-                      [
-                        {
-                          "key": "hot",
                           "value": "boolean"
                         },
                         {
@@ -143,6 +113,47 @@
                         },
                         {
                           "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "items",
+                    "value": [
+                      [
+                        {
+                          "key": "hot",
+                          "value": "boolean"
+                        },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "score",
                           "value": "string"
                         },
                         {

@@ -1,6 +1,6 @@
 {
   "scraper": "ytmusic",
-  "capturedAt": "2026-09-30T03:12:04.457Z",
+  "capturedAt": "2026-10-02T14:25:47.346Z",
   "cases": [
     {
       "args": [
@@ -232,18 +232,7 @@
             [
               {
                 "key": "artists",
-                "value": [
-                  [
-                    {
-                      "key": "id",
-                      "value": "string"
-                    },
-                    {
-                      "key": "name",
-                      "value": "string"
-                    }
-                  ]
-                ]
+                "value": []
               },
               {
                 "key": "browseId",
@@ -278,136 +267,6 @@
               {
                 "key": "videoId",
                 "value": "string"
-              }
-            ],
-            [
-              {
-                "key": "browseId",
-                "value": "string"
-              },
-              {
-                "key": "category",
-                "value": "string"
-              },
-              {
-                "key": "resultType",
-                "value": "null"
-              },
-              {
-                "key": "songs",
-                "value": [
-                  [
-                    {
-                      "key": "artists",
-                      "value": [
-                        "<empty>"
-                      ]
-                    },
-                    {
-                      "key": "browseId",
-                      "value": "null"
-                    },
-                    {
-                      "key": "duration",
-                      "value": "null"
-                    },
-                    {
-                      "key": "plays",
-                      "value": "null"
-                    },
-                    {
-                      "key": "resultType",
-                      "value": "string"
-                    },
-                    {
-                      "key": "subtitle",
-                      "value": "string"
-                    },
-                    {
-                      "key": "thumbnails",
-                      "value": [
-                        "string"
-                      ]
-                    },
-                    {
-                      "key": "title",
-                      "value": "string"
-                    },
-                    {
-                      "key": "videoId",
-                      "value": "string"
-                    }
-                  ],
-                  [
-                    {
-                      "key": "artists",
-                      "value": [
-                        [
-                          {
-                            "key": "id",
-                            "value": "string"
-                          },
-                          {
-                            "key": "name",
-                            "value": "string"
-                          }
-                        ]
-                      ]
-                    },
-                    {
-                      "key": "browseId",
-                      "value": "null"
-                    },
-                    {
-                      "key": "duration",
-                      "value": "string"
-                    },
-                    {
-                      "key": "plays",
-                      "value": "string"
-                    },
-                    {
-                      "key": "resultType",
-                      "value": "string"
-                    },
-                    {
-                      "key": "subtitle",
-                      "value": "string"
-                    },
-                    {
-                      "key": "thumbnails",
-                      "value": [
-                        "string"
-                      ]
-                    },
-                    {
-                      "key": "title",
-                      "value": "string"
-                    },
-                    {
-                      "key": "videoId",
-                      "value": "string"
-                    }
-                  ]
-                ]
-              },
-              {
-                "key": "subtitle",
-                "value": "string"
-              },
-              {
-                "key": "thumbnails",
-                "value": [
-                  "string"
-                ]
-              },
-              {
-                "key": "title",
-                "value": "string"
-              },
-              {
-                "key": "videoId",
-                "value": "null"
               }
             ]
           ]

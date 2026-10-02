@@ -1,6 +1,6 @@
 {
   "scraper": "ngomik",
-  "capturedAt": "2026-09-30T18:50:53.461Z",
+  "capturedAt": "2026-10-02T14:46:58.753Z",
   "cases": [
     {
       "args": [
@@ -156,24 +156,6 @@
                           "key": "colored",
                           "value": "boolean"
                         },
-                        {
-                          "key": "image",
-                          "value": "string"
-                        },
-                        {
-                          "key": "title",
-                          "value": "string"
-                        },
-                        {
-                          "key": "type",
-                          "value": "string"
-                        },
-                        {
-                          "key": "url",
-                          "value": "string"
-                        }
-                      ],
-                      [
                         {
                           "key": "image",
                           "value": "string"
