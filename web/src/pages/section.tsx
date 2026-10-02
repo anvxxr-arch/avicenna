@@ -65,6 +65,16 @@ const config: Record<string, SectionConfig> = {
       { name: 'sections (slow)', path: '/lk21/sections' },
     ],
   },
+  '/manga': {
+    examples: [
+      { name: 'susuku search', path: '/mangasusuku/search', params: { args: 'solo leveling' }, input: { key: 'args', placeholder: 'search manga…' } },
+      { name: 'susuku detail', path: '/mangasusuku/detail', params: { args: 'solo-leveling' } },
+      { name: 'susuku chapter', path: '/mangasusuku/chapter', params: { args: 'solo-leveling-chapter-155' } },
+      { name: 'kanzenin azlist', path: '/kanzenin/azlist', params: { args: 'A' } },
+      { name: 'ngomik genre', path: '/ngomik/genre', params: { args: 'action' } },
+      { name: 'sankanime terbaru', path: '/sankanime/terbaru' },
+    ],
+  },
   '/music': {
     examples: [
       { name: 'track', path: '/spotify/track', params: { args: '6PQ88X9TkUIAUIZJHW2upE' } },
@@ -106,7 +116,6 @@ const config: Record<string, SectionConfig> = {
     examples: [
       { name: 'image styles', path: '/codeengo/styles' },
       { name: 'source token', path: '/viewpagesource/token' },
-      { name: 'image styles', path: '/codeengo/styles' },
     ],
   },
 };

@@ -1,0 +1,684 @@
+{
+  "scraper": "ngomik",
+  "capturedAt": "2026-09-30T18:50:53.461Z",
+  "cases": [
+    {
+      "args": [
+        "home"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                },
+                {
+                  "key": "next",
+                  "value": "string"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            },
+            {
+              "key": "sections",
+              "value": [
+                [
+                  {
+                    "key": "items",
+                    "value": [
+                      [
+                        {
+                          "key": "colored",
+                          "value": "boolean"
+                        },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "score",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ],
+                      [
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "score",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "items",
+                    "value": [
+                      [
+                        {
+                          "key": "colored",
+                          "value": "boolean"
+                        },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "score",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "items",
+                    "value": [
+                      [
+                        {
+                          "key": "colored",
+                          "value": "boolean"
+                        },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ],
+                      [
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "search",
+        "eleceed"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "colored",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "latest",
+                    "value": "string"
+                  },
+                  {
+                    "key": "score",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                }
+              ]
+            },
+            {
+              "key": "query",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genrelist"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "count",
+                    "value": "number"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genre",
+        "action",
+        "2"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genre",
+              "value": "string"
+            },
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "colored",
+                    "value": "boolean"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "latest",
+                    "value": "string"
+                  },
+                  {
+                    "key": "score",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "latest",
+                    "value": "string"
+                  },
+                  {
+                    "key": "score",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                },
+                {
+                  "key": "next",
+                  "value": "string"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "eleceed"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "artist",
+              "value": "string"
+            },
+            {
+              "key": "author",
+              "value": "string"
+            },
+            {
+              "key": "chapters",
+              "value": [
+                [
+                  {
+                    "key": "date",
+                    "value": "string"
+                  },
+                  {
+                    "key": "number",
+                    "value": "number"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ],
+                [
+                  {
+                    "key": "date",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "cover",
+              "value": "string"
+            },
+            {
+              "key": "followers",
+              "value": "number"
+            },
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  },
+                  {
+                    "key": "url",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "postedBy",
+              "value": "string"
+            },
+            {
+              "key": "postedOn",
+              "value": "string"
+            },
+            {
+              "key": "released",
+              "value": "string"
+            },
+            {
+              "key": "score",
+              "value": "string"
+            },
+            {
+              "key": "serialization",
+              "value": "string"
+            },
+            {
+              "key": "slug",
+              "value": "string"
+            },
+            {
+              "key": "status",
+              "value": "string"
+            },
+            {
+              "key": "synopsis",
+              "value": "string"
+            },
+            {
+              "key": "title",
+              "value": "string"
+            },
+            {
+              "key": "type",
+              "value": "string"
+            },
+            {
+              "key": "updatedOn",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "chapter",
+        "eleceed-chapter-420"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "images",
+              "value": [
+                "string"
+              ]
+            },
+            {
+              "key": "mode",
+              "value": "string"
+            },
+            {
+              "key": "prevUrl",
+              "value": "string"
+            },
+            {
+              "key": "series",
+              "value": [
+                {
+                  "key": "title",
+                  "value": "string"
+                },
+                {
+                  "key": "url",
+                  "value": "string"
+                }
+              ]
+            },
+            {
+              "key": "servers",
+              "value": [
+                [
+                  {
+                    "key": "images",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "slug",
+              "value": "string"
+            },
+            {
+              "key": "title",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genre",
+        "../etc"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "traversal slug must be rejected"
+    }
+  ]
+}

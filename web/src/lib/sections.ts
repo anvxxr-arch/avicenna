@@ -41,8 +41,9 @@ export const SECTIONS: SectionDef[] = [
     endpoints: ['/lk21/list', '/lk21/sections', '/lk21/detail', '/lk21/list-detail'], runtime: 'go', status: 'live', source: 'tv12.lk21official.cc',
   },
   {
-    path: '/manga', label: 'Manga', blurb: 'Manga catalogue search and chapter metadata.',
-    endpoints: ['/manga (planned)'], runtime: 'go', status: 'planned', source: '—',
+    path: '/manga', label: 'Manga', blurb: 'Manga catalogue search and chapter images: mangasusuku, kanzenin, ngomik, sankanime.',
+    endpoints: ['/mangasusuku/home', '/mangasusuku/search', '/mangasusuku/detail', '/mangasusuku/chapter', '/kanzenin/azlist', '/ngomik/genre', '/sankanime/terbaru'],
+    runtime: 'go', status: 'live', source: 'mangasusuku.com / kanzenin.info / 02.ngomik.cc / sankanime.web.id',
   },
   {
     path: '/music', label: 'Music', blurb: 'Spotify open-web graph: tracks, albums, artists, playlists, podcasts.',

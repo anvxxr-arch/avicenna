@@ -43,9 +43,10 @@ interface Contract {
 interface RunResult { exit: number; stdout: string; stderr: string }
 
 const SCRAPERS = [
-  'anilist', 'animeindo', 'codeengo', 'drowify', 'freeconvert', 'lk21',
-  'otakudesu', 'sakana', 'samehadaku', 'spotify', 'tiktok', 'view-page-source',
-  'whitehouse', 'yt', 'ytmusic',
+  'anilist', 'animeindo', 'codeengo', 'drowify', 'freeconvert', 'kanzenin',
+  'lk21', 'mangasusuku', 'ngomik',
+  'otakudesu', 'sakana', 'samehadaku', 'sankanime', 'spotify', 'tiktok',
+  'view-page-source', 'whitehouse', 'yt', 'ytmusic',
 ] as const;
 
 const GOLDEN_DIR = 'specs/003-scraper-unification/golden';
@@ -158,6 +159,43 @@ const MATRIX: Record<string, Array<[string[], string?]>> = {
   lk21: [
     [['detail', 'uprising-2026']],
     [['detail', 'no-such-film-xyz-404'], 'unknown slug must surface an explicit error'],
+  ],
+  kanzenin: [
+    [['home']],
+    [['search', 'one piece']],
+    [['genrelist']],
+    [['detail', 'family-control']],
+    [['chapter', 'family-control-chapter-5']],
+    [['azlist', 'A']],
+    [['genre', '../etc'], 'traversal slug must be rejected'],
+  ],
+  mangasusuku: [
+    [['home']],
+    [['search', 'solo leveling']],
+    [['genrelist']],
+    [['detail', 'solo-leveling']],
+    [['chapter', 'solo-leveling-chapter-155']],
+    [['azlist', 'A']],
+    [['genre', '../etc'], 'traversal slug must be rejected'],
+  ],
+  ngomik: [
+    [['home']],
+    [['search', 'eleceed']],
+    [['genrelist']],
+    [['genre', 'action', '2']],
+    [['detail', 'eleceed']],
+    [['chapter', 'eleceed-chapter-420']],
+    [['genre', '../etc'], 'traversal slug must be rejected'],
+  ],
+  sankanime: [
+    [['home']],
+    [['terbaru']],
+    [['search', 'naruto']],
+    [['genrelist']],
+    [['genre', 'action']],
+    [['detail', 'naruto-konohas-story-the-steam-ninja-scrolls']],
+    [['chapter', 'naruto-konohas-story-the-steam-ninja-scrolls-chapter-15']],
+    [['genre', '../etc'], 'traversal slug must be rejected'],
   ],
   otakudesu: [
     [['home']],

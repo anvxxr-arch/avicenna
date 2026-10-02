@@ -1,0 +1,494 @@
+{
+  "scraper": "sankanime",
+  "capturedAt": "2026-09-30T18:58:54.155Z",
+  "cases": [
+    {
+      "args": [
+        "home"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "terbaru"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "chapter",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "link",
+                    "value": "string"
+                  },
+                  {
+                    "key": "time_ago",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current_page",
+                  "value": "number"
+                },
+                {
+                  "key": "has_more",
+                  "value": "boolean"
+                },
+                {
+                  "key": "per_page",
+                  "value": "number"
+                },
+                {
+                  "key": "total_on_page",
+                  "value": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "search",
+        "naruto"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "description",
+                    "value": "string"
+                  },
+                  {
+                    "key": "genre",
+                    "value": "string"
+                  },
+                  {
+                    "key": "href",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  },
+                  {
+                    "key": "thumbnail",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  },
+                  {
+                    "key": "type",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "query",
+              "value": "string"
+            },
+            {
+              "key": "total",
+              "value": "number"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genrelist"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "value",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genre",
+        "action"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "genre",
+              "value": "string"
+            },
+            {
+              "key": "items",
+              "value": [
+                [
+                  {
+                    "key": "chapter",
+                    "value": "string"
+                  },
+                  {
+                    "key": "genre",
+                    "value": "string"
+                  },
+                  {
+                    "key": "image",
+                    "value": "string"
+                  },
+                  {
+                    "key": "link",
+                    "value": "string"
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "metadata",
+              "value": [
+                {
+                  "key": "cache_enabled",
+                  "value": "boolean"
+                },
+                {
+                  "key": "returned",
+                  "value": "number"
+                },
+                {
+                  "key": "total_found",
+                  "value": "number"
+                }
+              ]
+            },
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current_page",
+                  "value": "number"
+                },
+                {
+                  "key": "has_more",
+                  "value": "boolean"
+                },
+                {
+                  "key": "per_page",
+                  "value": "number"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "detail",
+        "naruto-konohas-story-the-steam-ninja-scrolls"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "background_story",
+              "value": "string"
+            },
+            {
+              "key": "chapters",
+              "value": [
+                [
+                  {
+                    "key": "chapter",
+                    "value": "string"
+                  },
+                  {
+                    "key": "date",
+                    "value": "string"
+                  },
+                  {
+                    "key": "link",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "genres",
+              "value": [
+                [
+                  {
+                    "key": "link",
+                    "value": "string"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  },
+                  {
+                    "key": "slug",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "image",
+              "value": "string"
+            },
+            {
+              "key": "metadata",
+              "value": [
+                {
+                  "key": "age_rating",
+                  "value": "string"
+                },
+                {
+                  "key": "author",
+                  "value": "string"
+                },
+                {
+                  "key": "concept",
+                  "value": "string"
+                },
+                {
+                  "key": "reading_direction",
+                  "value": "string"
+                },
+                {
+                  "key": "status",
+                  "value": "string"
+                },
+                {
+                  "key": "type",
+                  "value": "string"
+                }
+              ]
+            },
+            {
+              "key": "slug",
+              "value": "string"
+            },
+            {
+              "key": "summary",
+              "value": "string"
+            },
+            {
+              "key": "synopsis",
+              "value": "string"
+            },
+            {
+              "key": "synopsis_full",
+              "value": "string"
+            },
+            {
+              "key": "title",
+              "value": "string"
+            },
+            {
+              "key": "title_indonesian",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "chapter",
+        "naruto-konohas-story-the-steam-ninja-scrolls-chapter-15"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "chapter_title",
+              "value": "string"
+            },
+            {
+              "key": "images",
+              "value": [
+                "string"
+              ]
+            },
+            {
+              "key": "manga_title",
+              "value": "string"
+            },
+            {
+              "key": "navigation",
+              "value": [
+                {
+                  "key": "chapterList",
+                  "value": "string"
+                },
+                {
+                  "key": "previousChapter",
+                  "value": "string"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ]
+    },
+    {
+      "args": [
+        "genre",
+        "../etc"
+      ],
+      "exit": 1,
+      "errorRe": "\\[ERROR\\]",
+      "note": "traversal slug must be rejected"
+    }
+  ]
+}

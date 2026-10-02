@@ -1,12 +1,12 @@
 # Avicenna
 
-One normalised HTTP API over fifteen media sources — anime, film, manga, music, video and social — plus a
+One normalised HTTP API over nineteen media sources — anime, film, manga, music, video and social — plus a
 React frontend. Hardening (SSRF pinning, rate limits, body caps, timeouts, WAF detection) lives in the
 transport, once, and is verified on the real surface.
 
 - **API**: `nontonanime serve` (Go, standard library only) — uniform envelope, cache headers that reflect reality, OpenAPI emitted from the same route table that serves traffic.
 - **Frontend**: React 19 + Tailwind v4 + anime.js, bundled and served by Bun. Pages: `/`, `/docs`, `/playground`, `/about`, and one page per source (`/anime`, `/film`, `/manga`, `/music`, `/youtube`, `/tiktok`, `/instagram`, `/facebook`, `/twitter`, `/drowify`, `/whitehouse`, `/tools`).
-- **Scrapers**: 14 sources ported to Go (`scrapers/`), served both as CLI commands and as
+- **Scrapers**: 18 sources ported to Go (`scrapers/`), served both as CLI commands and as
   `/api/v1/<scraper>/<command>` routes generated from the same registry.
 - **Reference implementation**: the TypeScript CLIs. The Go/Rust ports are diffed against them by a live parity suite.
 
@@ -63,6 +63,10 @@ bun freeconvert.ts compress downloads/input.mp4 40
 bun view-page-source.ts view https://example.com
 bun anilist.ts populer
 bun sakana.ts chat "halo"
+bun mangasusuku.ts search "solo leveling"   # manga (Themesia family)
+bun kanzenin.ts azlist A
+bun ngomik.ts genre action 2
+bun sankanime.ts terbaru                     # manga (official Sankanime API)
 ```
 
 All of them share `core/cli.ts`: `help` prints a command table, failures print `[ERROR] …` to stderr and
@@ -74,7 +78,7 @@ exit 1, and output is JSON on stdout.
 bun run check              # typecheck (app + web) + guards + contracts + secret scan
 bun tools/parity.ts --guards-only   # 16 offline cross-runtime guard cases (TS/Go/Rust)
 bun tools/parity.ts --live          # 21 commands × 3 runtimes, deep-equal shapes
-bun tools/contract.ts --check       # 14 scrapers × live commands, payload shape contracts
+bun tools/contract.ts --check       # 18 scrapers × live commands, payload shape contracts
 bun tools/contract.ts --capture     # re-record contracts after a deliberate change
 bun tools/scan-secrets.ts --all     # secret scan (also wired as .githooks/pre-commit)
 ```
