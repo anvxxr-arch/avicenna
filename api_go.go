@@ -269,8 +269,16 @@ func init() {
 	apiCommandHook = handleAPICommand
 }
 
+// apiIndexPathList is the route list the index handler advertises. It is filled
+// in init(), never by a package-level call: apiRoutes → handwrittenRoutes →
+// hIndex → apiRoutes would otherwise be an initialization cycle, and hIndex
+// only reads the list at request time anyway.
+var apiIndexPathList []string
+
+func init() { apiIndexPathList = apiIndexPaths() }
+
 func hIndex(s *apiServer, q map[string][]string) (apiResult, *apiFault) {
-	return apiResult{Data: IndexData{Name: apiName, UptimeS: apiUptimeSeconds()}, TTL: ttlLong}, nil
+	return apiResult{Data: IndexData{Name: apiName, UptimeS: apiUptimeSeconds(), Routes: apiIndexPathList}, TTL: ttlLong}, nil
 }
 
 func hHealth(s *apiServer, q map[string][]string) (apiResult, *apiFault) {

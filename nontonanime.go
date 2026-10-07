@@ -1877,7 +1877,7 @@ func getTopAnime() ([]TopAnime, error) {
 	for _, k := range order {
 		out = append(out, seen[k])
 	}
-	sort.SliceStable(out, func(i, j int) bool { return parseNum(out[i].Score) > parseNum(out[j].Score) })
+	sort.SliceStable(out, func(i, j int) bool { return parseNumOr0(out[i].Score) > parseNumOr0(out[j].Score) })
 	return out, nil
 }
 

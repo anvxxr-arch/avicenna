@@ -38,6 +38,15 @@ interface Case {
    * one, which is exactly the set the check can require without flaking.
    */
   allowVariants?: boolean;
+  /**
+   * Coarse key-universe contract (see COARSE_CASES): the payload legitimately
+   * varies in which optional fields are present, so only the set of field names
+   * is checked. `keys` is that universe, intersected over 8 capture samples so
+   * a field seen in just one sample cannot make the golden flaky.
+   */
+  coarse?: boolean;
+  /** Intersected key universe for a coarse case. */
+  keys?: string[];
 }
 interface Contract {
   scraper: string;
@@ -217,6 +226,36 @@ function diffShape(a: unknown, b: unknown, path = '$'): string | null {
 /** Commands whose live list genuinely mixes item kinds (see Case.allowVariants). */
 const VARIANT_CASES = new Set(['yt search', 'yt related', 'ytmusic search', 'ytmusic related']);
 
+/**
+ * Commands whose payload legitimately varies in WHICH optional fields are
+ * present: the manga/anime home feeds omit per-card badge fields
+ * (`colored`/`hot`/`latest`/`score`) on cards that lack them, and the manga
+ * chapter nav only emits `prevUrl`/`nextUrl` when a sibling chapter exists. An
+ * exact (or per-kind) shape match on those can never be stable — measured on
+ * `kanzenin home`: 8 capture samples agreed on a card kind, and the very next
+ * live request had a different field set on every card. Their contract is the
+ * KEY UNIVERSE instead: every field name the golden ever saw must still appear
+ * somewhere in the live payload. Capture intersects 8 samples so the golden
+ * itself is not flaky.
+ */
+const COARSE_CASES = new Set(['kanzenin home', 'ngomik home', 'ngomik chapter', 'spotify search']);
+
+/** Every field name anywhere in a shape (keymaps are arrays of {key,value}). */
+function keyUniverse(s: unknown, out = new Set<string>()): Set<string> {
+  if (Array.isArray(s)) {
+    for (const x of s) keyUniverse(x, out);
+    return out;
+  }
+  if (s && typeof s === 'object') {
+    const o = s as Record<string, unknown>;
+    if ('key' in o && 'value' in o) {
+      out.add(o.key as string);
+      keyUniverse(o.value, out);
+    }
+  }
+  return out;
+}
+
 const MATRIX: Record<string, Array<[string[], string?]>> = {
   anilist: [
     [['populer'], 'anilist.co is a Vue SPA with the GraphQL API disabled server-side'],
@@ -356,9 +395,24 @@ async function capture(scraper: string): Promise<Contract> {
         if (/Commands:/.test(r.stdout)) parsed = { kind: 'help-text' };
         else throw new Error(`${scraper} ${args.join(' ')}: exit 0 but stdout is neither JSON nor help text:\n${r.stdout.slice(0, 200)}`);
       }
-      const variant = VARIANT_CASES.has(`${scraper} ${args[0]}`);
+      const key = `${scraper} ${args[0]}`;
+      const variant = VARIANT_CASES.has(key);
+      const coarse = COARSE_CASES.has(key);
       let shape = shapeOf(parsed);
-      if (variant) {
+      if (coarse) {
+        // Intersect the key universe over samples so a field that shows up in
+        // only one response cannot be recorded as a requirement.
+        let keys = keyUniverse(shapeOf(parsed));
+        for (let i = 0; i < 7; i++) {
+          const again = await run(scraper, args);
+          if (again.exit !== 0) continue;
+          try {
+            const ku = keyUniverse(shapeOf(JSON.parse(again.stdout)));
+            keys = new Set([...keys].filter((k) => ku.has(k)));
+          } catch { /* non-JSON help text: ignore */ }
+        }
+        cases.push({ args, exit: 0, shape, note, coarse: true, keys: [...keys].sort() });
+      } else if (variant) {
         // These rails mix item kinds across requests, and the rare kinds come and
         // go between runs — measured on `yt search`: video/mix/short in 20/20 runs
         // but the playlist kind in 1/20; on `yt related`: video 20/20, playlist
@@ -403,8 +457,14 @@ async function check(scraper: string, contract: Contract): Promise<string[]> {
         else { fails.push(`${label}: stdout is neither JSON nor help text`); continue; }
       }
       const spotted = shapeOf(parsed);
-      const d = c.allowVariants ? variantGap(c.shape, spotted) : diffShape(c.shape, spotted);
-      if (d) fails.push(`${label}: shape drift ${d}`);
+      if (c.coarse) {
+        const liveKeys = keyUniverse(spotted);
+        const missing = (c.keys ?? []).filter((k) => !liveKeys.has(k));
+        if (missing.length) fails.push(`${label}: coarse drift — field(s) no longer present: ${missing.join(', ')}`);
+      } else {
+        const d = c.allowVariants ? variantGap(c.shape, spotted) : diffShape(c.shape, spotted);
+        if (d) fails.push(`${label}: shape drift ${d}`);
+      }
     } else if (c.errorRe && !new RegExp(c.errorRe, 'i').test(r.stderr)) {
       fails.push(`${label}: stderr does not match /${c.errorRe}/`);
     }

@@ -1,6 +1,6 @@
 {
   "scraper": "ngomik",
-  "capturedAt": "2026-10-02T14:46:58.753Z",
+  "capturedAt": "2026-10-07T17:25:23.091Z",
   "cases": [
     {
       "args": [
@@ -120,6 +120,154 @@
                           "value": "string"
                         },
                         {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ],
+                      [
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "key": "title",
+                    "value": "string"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ],
+      "coarse": true,
+      "keys": [
+        "colored",
+        "creator",
+        "current",
+        "data",
+        "hasNext",
+        "image",
+        "items",
+        "latest",
+        "next",
+        "page",
+        "pagination",
+        "score",
+        "sections",
+        "title",
+        "total",
+        "type",
+        "url"
+      ]
+    },
+    {
+      "args": [
+        "home"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "pagination",
+              "value": [
+                {
+                  "key": "current",
+                  "value": "number"
+                },
+                {
+                  "key": "hasNext",
+                  "value": "boolean"
+                },
+                {
+                  "key": "next",
+                  "value": "string"
+                },
+                {
+                  "key": "total",
+                  "value": "number"
+                }
+              ]
+            },
+            {
+              "key": "sections",
+              "value": [
+                [
+                  {
+                    "key": "items",
+                    "value": [
+                      [
+                        {
+                          "key": "colored",
+                          "value": "boolean"
+                        },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "latest",
+                          "value": "string"
+                        },
+                        {
+                          "key": "score",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ],
+                      [
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
                           "key": "latest",
                           "value": "string"
                         },
@@ -156,6 +304,24 @@
                           "key": "colored",
                           "value": "boolean"
                         },
+                        {
+                          "key": "image",
+                          "value": "string"
+                        },
+                        {
+                          "key": "title",
+                          "value": "string"
+                        },
+                        {
+                          "key": "type",
+                          "value": "string"
+                        },
+                        {
+                          "key": "url",
+                          "value": "string"
+                        }
+                      ],
+                      [
                         {
                           "key": "image",
                           "value": "string"
@@ -597,6 +763,108 @@
             },
             {
               "key": "mode",
+              "value": "string"
+            },
+            {
+              "key": "nextUrl",
+              "value": "string"
+            },
+            {
+              "key": "prevUrl",
+              "value": "string"
+            },
+            {
+              "key": "series",
+              "value": [
+                {
+                  "key": "title",
+                  "value": "string"
+                },
+                {
+                  "key": "url",
+                  "value": "string"
+                }
+              ]
+            },
+            {
+              "key": "servers",
+              "value": [
+                [
+                  {
+                    "key": "images",
+                    "value": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              ]
+            },
+            {
+              "key": "slug",
+              "value": "string"
+            },
+            {
+              "key": "title",
+              "value": "string"
+            }
+          ]
+        },
+        {
+          "key": "page",
+          "value": "string"
+        },
+        {
+          "key": "url",
+          "value": "string"
+        }
+      ],
+      "coarse": true,
+      "keys": [
+        "creator",
+        "data",
+        "images",
+        "mode",
+        "name",
+        "nextUrl",
+        "page",
+        "prevUrl",
+        "series",
+        "servers",
+        "slug",
+        "title",
+        "url"
+      ]
+    },
+    {
+      "args": [
+        "chapter",
+        "eleceed-chapter-420"
+      ],
+      "exit": 0,
+      "shape": [
+        {
+          "key": "creator",
+          "value": "string"
+        },
+        {
+          "key": "data",
+          "value": [
+            {
+              "key": "images",
+              "value": [
+                "string"
+              ]
+            },
+            {
+              "key": "mode",
+              "value": "string"
+            },
+            {
+              "key": "nextUrl",
               "value": "string"
             },
             {
