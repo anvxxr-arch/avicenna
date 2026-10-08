@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-09
 
-**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 85 pass / 0 fail / 0 skip-waf / 5 n/a). The 5 n/a rows are the tiktok surface, which the Rust port does not implement (reported as n/a, not failed — see `skip` in `tools/parity.ts`).
+**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 89 pass / 0 fail / 0 skip-waf / 8 n/a). The n/a rows are the tiktok and spotify surfaces, which the Rust port does not implement (reported as n/a, not failed — see `skip` in `tools/parity.ts`).
 
 **Input**: User description: "Automated parity test suite proving nontonanime.ts, nontonanime.go, and nontonanime-rs produce identical behavior — command surface, JSON shapes, guard behavior, and live-site results."
 

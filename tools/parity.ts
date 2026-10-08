@@ -69,6 +69,9 @@ const CASES: Case[] = [
   // and CDN avatar URLs verified stable across repeated runs). The Rust port
   // covers the nontonanime surface only, so it is n/a here.
   { name: 'tiktok-user', args: ['tiktok', 'user', 'tiktok'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
+  // spotify: a search response carries only stable fields (id/name/uri/year —
+  // no play counters in this shape), so it is safe as a live row.
+  { name: 'spotify-search', args: ['spotify', 'search', 'daft punk'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
 ];
 
 // === GUARDS (offline) — reject semantics: exit 1 + non-empty stderr.
@@ -93,6 +96,9 @@ const GUARDS: Array<{ name: string; args: string[]; skip?: string[]; tsFile?: st
   { name: 'tiktok-empty-args', args: ['tiktok', 'user'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
   { name: 'tiktok-evil-host-video', args: ['tiktok', 'video', 'https://evil.com/video/123'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
   { name: 'tiktok-lookalike-video', args: ['tiktok', 'video', 'https://www.tiktok.com.evil.com/video/7301234567890123456'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
+  // spotify: both entrypoints must refuse a missing id/query with exit 1.
+  { name: 'spotify-missing-id', args: ['spotify', 'track'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  { name: 'spotify-empty-query', args: ['spotify', 'search'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
 ];
 
 const NONCE_RE = /^[a-f0-9]{6,20}$/;
