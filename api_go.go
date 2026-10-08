@@ -17,6 +17,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -244,6 +245,10 @@ func jsParseInt(s string) (int, bool) {
 		}
 		n, err := strconv.ParseUint(t[start:j], 16, 64)
 		if err != nil {
+			if errors.Is(err, strconv.ErrRange) {
+				// parseInt never fails on a digit run; it loses precision instead.
+				return saturate(neg), true
+			}
 			return 0, false
 		}
 		v := int(n)
@@ -261,12 +266,30 @@ func jsParseInt(s string) (int, bool) {
 	}
 	n, err := strconv.Atoi(t[start:i])
 	if err != nil {
+		if errors.Is(err, strconv.ErrRange) {
+			// Same as above: a digit run longer than an int saturates, because the
+			// reference's parseInt returns a double and the clamped callers
+			// (apiPage, apiServerNum) then pin it to their bound. Without this the
+			// caller fell back to 1, so ?page=99999999999999999999 asked for page 1
+			// where the reference asks for page 50.
+			return saturate(neg), true
+		}
 		return 0, false
 	}
 	if neg {
 		n = -n
 	}
 	return n, true
+}
+
+// saturate returns the largest (or smallest) int, standing in for a digit run
+// too long to hold — the closest int an int-only port can give to the reference's
+// lossy parseInt double.
+func saturate(neg bool) int {
+	if neg {
+		return math.MinInt
+	}
+	return math.MaxInt
 }
 
 func isHexDigit(b byte) bool {

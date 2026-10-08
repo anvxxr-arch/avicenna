@@ -975,12 +975,7 @@ func getLatestEpisodes(page int) ([]Episode, error) {
 
 func getHomeContent(page int) (HomeContent, error) {
 	page = clampPage(page)
-	var u string
-	if page == 1 {
-		u = BASE + "/"
-	} else {
-		u = fmt.Sprintf("%s/page/%d/", BASE, page)
-	}
+	u := pagePath(BASE, page)
 	html, err := fetchPage(u)
 	if err != nil {
 		return HomeContent{}, err
@@ -1952,6 +1947,23 @@ func clampInt(n, lo, hi int) int {
 		return hi
 	}
 	return n
+}
+
+// pagePath renders the upstream path for a paginated index: page 1 is the bare
+// index, anything else is /page/N/. It is a named function so the whole coercion
+// chain — hostile ?page= value -> apiPage -> clampPage -> the URL actually
+// requested — is testable without the network, which live payload checks cannot
+// do: this origin answers /home and /home/page/N/ with the same twenty cards,
+// so only the request URL distinguishes them.
+//
+// The `== 1` (not `<= 1`) comparison is deliberate: callers clamp first, and
+// keeping the original comparison makes this extraction byte-for-byte behaviour
+// preserving.
+func pagePath(base string, page int) string {
+	if page == 1 {
+		return base + "/"
+	}
+	return fmt.Sprintf("%s/page/%d/", base, page)
 }
 
 func clampPage(p int) int { return clampInt(p, 1, 50) }
