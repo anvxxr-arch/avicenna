@@ -58,6 +58,30 @@ var apiStarted = time.Now()
 
 func apiUptimeSeconds() int { return int(time.Since(apiStarted) / time.Second) }
 
+// Admin-purge abuse control. A purge is an admin op, not a cache-busting
+// primitive: at most purgeLimit evictions per purgeWindow per client, so a
+// leaked token cannot DoS the origin by purging in a loop.
+const (
+	purgeLimit  = 5
+	purgeWindow = 10 * time.Minute
+)
+
+// clientIP resolves the best available client address: X-Forwarded-For (first
+// hop) when present, otherwise the direct peer. Used only for audit logging and
+// per-client rate limiting — never for auth.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if h, _, err := net.SplitHostPort(strings.TrimSpace(strings.Split(xff, ",")[0])); err == nil {
+			return h
+		}
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	}
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return h
+	}
+	return r.RemoteAddr
+}
+
 // === ENVELOPE ===
 type apiEnvelope struct {
 	API     string      `json:"api"`
@@ -729,6 +753,13 @@ type apiServer struct {
 	cors       bool
 	spec       bool
 	adminToken string
+
+	// admin-purge abuse control: at most 5 evictions per 10-minute window per
+	// client. A purge is an admin op, not a cache-busting primitive — an attacker
+	// with a leaked token must not be able to DoS the origin by purging in a loop.
+	purgeMu     sync.Mutex
+	purgeBurst  map[string]int
+	purgeWindow time.Time
 }
 
 func cacheControlValue(ttl int) string {
@@ -785,6 +816,13 @@ func (s *apiServer) writeJSON(w http.ResponseWriter, status, ttl int, body inter
 func apiLog(r *http.Request, status int, d time.Duration) {
 	fmt.Fprintf(os.Stderr, "%s [api] %s %s -> %d %dms\n",
 		time.Now().Format(time.RFC3339), r.Method, r.URL.RequestURI(), status, d.Milliseconds())
+}
+
+// retryAfter is the Retry-After header value (delta-seconds) for a rate-limited
+// response, rounded UP so the client never retries one second too early.
+func retryAfter(remaining time.Duration) string {
+	sec := (remaining + time.Second - 1) / time.Second
+	return strconv.FormatInt(int64(sec), 10)
 }
 
 func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -886,8 +924,40 @@ func (s *apiServer) handlePurge(w *apiResponseWriter, r *http.Request, start tim
 		supplied = auth[len("Bearer "):]
 	}
 	if supplied == "" || subtle.ConstantTimeCompare([]byte(supplied), []byte(s.adminToken)) != 1 {
+		// Audit trail for failed admin attempts: IP + user-agent, never the token.
+		fmt.Fprintf(os.Stderr, "%s [audit] admin purge REJECTED %s ip=%s ua=%q\n",
+			time.Now().Format(time.RFC3339), r.RemoteAddr, clientIP(r), r.UserAgent())
 		s.writeJSON(w, http.StatusUnauthorized, ttlNone, apiErr("unauthorized", "Unauthorized"))
 		apiLog(r, http.StatusUnauthorized, time.Since(start))
+		return
+	}
+	// Rate-limit per client after auth: a leaked token must not be able to purge
+	// in a loop and starve the origin. The window is fixed for the whole server
+	// (purges are rare), so the state is one map plus one timestamp.
+	now := time.Now()
+	s.purgeMu.Lock()
+	if s.purgeBurst == nil {
+		s.purgeBurst = map[string]int{}
+	}
+	if now.Sub(s.purgeWindow) > purgeWindow {
+		s.purgeBurst = map[string]int{}
+		s.purgeWindow = now
+	}
+	ip := clientIP(r)
+	n := s.purgeBurst[ip]
+	remaining := time.Duration(0)
+	if n >= purgeLimit {
+		remaining = purgeWindow - now.Sub(s.purgeWindow)
+	} else {
+		s.purgeBurst[ip] = n + 1
+	}
+	s.purgeMu.Unlock()
+	if n >= purgeLimit {
+		w.Header().Set("Retry-After", retryAfter(remaining))
+		fmt.Fprintf(os.Stderr, "%s [audit] admin purge RATE-LIMITED ip=%s ua=%q retry_after=%s\n",
+			time.Now().Format(time.RFC3339), ip, r.UserAgent(), retryAfter(remaining))
+		s.writeJSON(w, http.StatusTooManyRequests, ttlNone, apiErr("rate_limited", "Too many purge requests; slow down"))
+		apiLog(r, http.StatusTooManyRequests, time.Since(start))
 		return
 	}
 	// Two caches back the API: the primary origin's page cache (package main)
@@ -895,6 +965,8 @@ func (s *apiServer) handlePurge(w *apiResponseWriter, r *http.Request, start tim
 	// included). Both are package-level, so both outlive any request — purge
 	// both and report the real total instead of inventing a number.
 	purged := purgePageCache() + scrapers.PurgeAll()
+	fmt.Fprintf(os.Stderr, "%s [audit] admin purge OK purged=%d ip=%s ua=%q\n",
+		time.Now().Format(time.RFC3339), purged, ip, r.UserAgent())
 	s.writeJSON(w, http.StatusOK, ttlNone, apiData(PurgeData{Purged: purged}))
 	apiLog(r, http.StatusOK, time.Since(start))
 }
@@ -1350,6 +1422,16 @@ func buildOpenAPIDoc() map[string]interface{} {
 					"content": apiErrorContent()},
 				"404": map[string]interface{}{"description": "not_found — no admin token configured",
 					"content": apiErrorContent()},
+				"429": map[string]interface{}{
+					"description": "rate_limited — more than 5 purge requests in a 10-minute window per client; see Retry-After",
+					"headers": map[string]interface{}{
+						"Retry-After": map[string]interface{}{
+							"description": "Seconds until the client may purge again",
+							"schema":    map[string]interface{}{"type": "integer"},
+						},
+					},
+					"content": apiErrorContent(),
+				},
 			},
 		},
 	}

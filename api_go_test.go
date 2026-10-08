@@ -219,6 +219,67 @@ func TestAdminPurgeContract(t *testing.T) {
 	}
 }
 
+// A leaked token must not turn the purge route into an origin DoS: after
+// purgeLimit evictions in one window the client gets 429 + Retry-After, and the
+// limiter is per-client so a second IP is unaffected.
+func TestAdminPurgeIsRateLimitedPerClient(t *testing.T) {
+	s := testServer(false, false, "s3cret")
+	auth := map[string]string{"Authorization": "Bearer s3cret"}
+
+	for i := 0; i < purgeLimit; i++ {
+		if rec := call(s, http.MethodPost, apiPurgePath, auth); rec.Code != http.StatusOK {
+			t.Fatalf("purge #%d = %d, want 200", i+1, rec.Code)
+		}
+	}
+
+	rec := call(s, http.MethodPost, apiPurgePath, auth)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("purge #%d = %d, want 429", purgeLimit+1, rec.Code)
+	}
+	if ra := rec.Header().Get("Retry-After"); ra == "" {
+		t.Error("429 without a Retry-After header")
+	}
+	if code := errorCode(t, decode(t, rec)); code != "rate_limited" {
+		t.Errorf("error.code = %q, want rate_limited", code)
+	}
+
+	// a different client is not limited by the first client's window
+	other := call(s, http.MethodPost, apiPurgePath, map[string]string{
+		"Authorization": "Bearer s3cret",
+		"X-Forwarded-For": "203.0.113.9",
+	})
+	if other.Code != http.StatusOK {
+		t.Errorf("second client purge = %d, want 200 (limit is per-client)", other.Code)
+	}
+}
+
+func TestClientIPResolution(t *testing.T) {
+	cases := []struct {
+		name string
+		req  func() *http.Request
+		want string
+	}{
+		{"direct peer", func() *http.Request { return httptest.NewRequest(http.MethodPost, "/x", nil) }, "192.0.2.1"},
+		{"xff single hop", func() *http.Request {
+			r := httptest.NewRequest(http.MethodPost, "/x", nil)
+			r.Header.Set("X-Forwarded-For", "198.51.100.7")
+			return r
+		}, "198.51.100.7"},
+		{"xff first hop wins", func() *http.Request {
+			r := httptest.NewRequest(http.MethodPost, "/x", nil)
+			r.Header.Set("X-Forwarded-For", "198.51.100.7, 10.0.0.1")
+			return r
+		}, "198.51.100.7"},
+	}
+	for _, c := range cases {
+		req := c.req()
+		req.RemoteAddr = "192.0.2.1:51234"
+		if got := clientIP(req); got != c.want {
+			t.Errorf("%s: clientIP = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestPurgePageCacheDropsEveryEntry(t *testing.T) {
 	cacheSet("https://example.test/one", "1")
 	cacheSet("https://example.test/two", "2")
