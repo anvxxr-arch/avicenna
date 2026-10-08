@@ -32,8 +32,16 @@ const RUNTIMES: Runtime[] = [
 const EP = 'https://s13.nontonanimeid.boats/black-torch-episode-1/';
 const ANIME = 'https://s13.nontonanimeid.boats/anime/black-torch/';
 
-// === CASES (live) — one row per CLI command, identical args everywhere ===
-interface Case { name: string; args: string[]; volatile?: string[][]; }
+// === CASES (live) — one row per CLI command, identical args everywhere.
+// `skip` lists runtimes that do not implement the command (the Rust port
+// covers the nontonanime surface only) — they are reported as n/a, not fail.
+// `tsFile` points the TS reference at a different CLI entrypoint (tiktok.ts
+// is a separate CLI from nontonanime.ts; without it the TS side would answer
+// "Unknown command" and a guard would look like a rejection when it is not).
+// `tsDrop` is how many leading args the sibling CLI does not take — the
+// dispatcher word ("tiktok") is part of the multi-scraper CLI's argv, not of
+// the single-scraper one.
+interface Case { name: string; args: string[]; volatile?: string[][]; skip?: string[]; tsFile?: string; tsDrop?: number; }
 const CASES: Case[] = [
   { name: 'home', args: ['home'] },
   { name: 'latest', args: ['latest'] },
@@ -57,10 +65,19 @@ const CASES: Case[] = [
   // nonce-derived: shape-check only
   { name: 'resolve', args: ['resolve', EP, '2'], volatile: [['$']] },
   { name: 'stream', args: ['stream', EP, '2'], volatile: [['$']] },
+  // tiktok: the @tiktok profile is a stable public fixture (follower counts
+  // and CDN avatar URLs verified stable across repeated runs). The Rust port
+  // covers the nontonanime surface only, so it is n/a here.
+  { name: 'tiktok-user', args: ['tiktok', 'user', 'tiktok'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
 ];
 
-// === GUARDS (offline) — reject semantics: exit 1 + non-empty stderr ===
-const GUARDS: Array<{ name: string; args: string[] }> = [
+// === GUARDS (offline) — reject semantics: exit 1 + non-empty stderr.
+// `skip` lists runtimes that do not implement the command at all (the Rust
+// port has no tiktok surface) — an unknown-command exit is a non-implementation,
+// not a missing guard, so it is reported as n/a, not fail.
+// `tsFile` picks the TS entrypoint (see Case). A reference that answers
+// "Unknown command" is a non-implementation too, never a rejection.
+const GUARDS: Array<{ name: string; args: string[]; skip?: string[]; tsFile?: string; tsDrop?: number }> = [
   { name: 'traversal-slug', args: ['genre', '../../etc'] },
   { name: 'bad-season', args: ['season', 'wat', '2024'] },
   { name: 'missing-year', args: ['season', 'winter'] },
@@ -69,13 +86,20 @@ const GUARDS: Array<{ name: string; args: string[] }> = [
   { name: 'evil-host-servers', args: ['servers', 'https://evil.com/x'] },
   { name: 'evil-host-resolve', args: ['resolve', 'https://evil.com/x'] },
   { name: 'empty-args', args: ['season'] },
+  // tiktok guards — both runtimes must reject with exit 1 + non-empty stderr.
+  // The lookalike is the one the Go shape guard added: the TS reference
+  // rejects it at the transport pin, Go at tiktokValidateVideoURL.
+  { name: 'tiktok-bad-username', args: ['tiktok', 'user', 'bad username!'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
+  { name: 'tiktok-empty-args', args: ['tiktok', 'user'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
+  { name: 'tiktok-evil-host-video', args: ['tiktok', 'video', 'https://evil.com/video/123'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
+  { name: 'tiktok-lookalike-video', args: ['tiktok', 'video', 'https://www.tiktok.com.evil.com/video/7301234567890123456'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
 ];
 
 const NONCE_RE = /^[a-f0-9]{6,20}$/;
 const URL_RE = /^https?:\/\//;
 const TIMEOUT_MS = 60_000;
 
-type Status = 'pass' | 'fail' | 'skip-waf' | 'empty-consistent' | 'env-fail';
+type Status = 'pass' | 'fail' | 'skip-waf' | 'empty-consistent' | 'na' | 'env-fail';
 
 interface CaseResult {
   command: string;
@@ -112,9 +136,15 @@ async function refreshBinaries(): Promise<void> {
 }
 
 interface RunOut { ok: boolean; stdout: string; stderr: string; code: number; }
-async function runBinary(rt: Runtime, args: string[]): Promise<RunOut> {
+async function runBinary(rt: Runtime, args: string[], tsFile?: string, tsDrop = 0): Promise<RunOut> {
   try {
-    const proc = Bun.spawn([rt.cmd[0], ...rt.cmd.slice(1), ...args], {
+    // The TS runtime normally runs nontonanime.ts; a case may point it at a
+    // sibling CLI (tiktok.ts) so a second entrypoint stays comparable. tsDrop
+    // removes the dispatcher word ("tiktok") that only the multi-scraper CLI
+    // carries in argv.
+    const cmd = rt.name === 'ts' && tsFile ? ['bun', tsFile] : rt.cmd;
+    const argv = rt.name === 'ts' && tsFile ? args.slice(tsDrop) : args;
+    const proc = Bun.spawn([cmd[0], ...cmd.slice(1), ...argv], {
       stdout: 'pipe',
       stderr: 'pipe',
       timeout: TIMEOUT_MS,
@@ -205,7 +235,14 @@ async function main(): Promise<void> {
   // --- GUARDS (offline) ---
   console.log(`\n═══ GUARDS (offline, reject semantics) ═══`);
   for (const g of GUARDS) {
-    const ref = await runBinary(ts, g.args);
+    const ref = await runBinary(ts, g.args, g.tsFile, g.tsDrop);
+    // An unknown command is a non-implementation, never a rejection: without
+    // this check the reference "passes" a guard it never evaluated.
+    if (/unknown command/i.test(ref.stderr) || /unknown command/i.test(ref.stdout)) {
+      results.push({ command: `guard:${g.name}`, runtime: 'ts', status: 'fail', durationMs: 0, detail: 'reference does not implement the command' });
+      console.log(`  ✗ guard:${g.name} — TS reference does not implement it (wrong entrypoint?)`);
+      continue;
+    }
     const refOk = !ref.ok && ref.stderr.trim().length > 0;
     if (!refOk) {
       results.push({ command: `guard:${g.name}`, runtime: 'ts', status: 'fail', durationMs: 0, detail: 'reference did not reject' });
@@ -213,6 +250,11 @@ async function main(): Promise<void> {
       continue;
     }
     for (const rt of others) {
+      if (g.skip?.includes(rt.name)) {
+        results.push({ command: `guard:${g.name}`, runtime: rt.name, status: 'na', durationMs: 0, detail: 'command not implemented' });
+        console.log(`  · guard:${g.name} [${rt.name}] n/a`);
+        continue;
+      }
       const t1 = Date.now();
       const out = await runBinary(rt, g.args);
       const ok = !out.ok && out.stderr.trim().length > 0;
@@ -227,7 +269,7 @@ async function main(): Promise<void> {
 
   // --- LIVE parity ---
   if (live) {
-    console.log(`\n═══ LIVE PARITY (21 commands × ${others.length} other runtimes) ═══`);
+    console.log(`\n═══ LIVE PARITY (${CASES.length} commands × ${others.length} other runtimes) ═══`);
     // pre-flight: one live call to detect network
     const pre = await runBinary(ts, ['genres']);
     if (!pre.ok && /timeout|econn|enotfound|connection|WAF/i.test(pre.stderr)) {
@@ -236,7 +278,7 @@ async function main(): Promise<void> {
 
     for (const c of CASES) {
       const t1 = Date.now();
-      const refOut = await runBinary(ts, c.args);
+      const refOut = await runBinary(ts, c.args, c.tsFile, c.tsDrop);
       const refDur = Date.now() - t1;
 
       let refJson: unknown;
@@ -254,6 +296,11 @@ async function main(): Promise<void> {
       const emptyAll = refStatus === 'pass' && Array.isArray(refJson) && (refJson as unknown[]).length === 0;
 
       for (const rt of others) {
+        if (c.skip?.includes(rt.name)) {
+          results.push({ command: c.name, runtime: rt.name, status: 'na', durationMs: 0, detail: 'command not implemented' });
+          console.log(`  · ${c.name} [${rt.name}] n/a`);
+          continue;
+        }
         const t2 = Date.now();
         const out = await runBinary(rt, c.args);
         const dur = Date.now() - t2;
@@ -292,7 +339,8 @@ async function main(): Promise<void> {
   const pass = results.filter((r) => r.status === 'pass' || r.status === 'empty-consistent').length;
   const fails = results.filter((r) => r.status === 'fail');
   const skips = results.filter((r) => r.status === 'skip-waf');
-  console.log(`\n═══ RESULT: ${pass} pass · ${fails.length} fail · ${skips.length} skip-waf · ${Date.now() - t0}ms total ═══`);
+  const na = results.filter((r) => r.status === 'na').length;
+  console.log(`\n═══ RESULT: ${pass} pass · ${fails.length} fail · ${skips.length} skip-waf · ${na} n/a · ${Date.now() - t0}ms total ═══`);
 
   mkdirSync(dirname(resolve(reportPath)), { recursive: true });
   writeFileSync(reportPath, JSON.stringify({

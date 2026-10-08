@@ -12,7 +12,7 @@
 
 ## Phase 2 — Live suite
 
-- [x] 2.1 Implement CASES table: all 21 commands with identical args + `--live` gate
+- [x] 2.1 Implement CASES table: all commands with identical args + `--live` gate
 - [x] 2.2 runCase(): 60s timeout, WAF single-retry → `skip-waf`, empty-on-all → `empty-consistent`
 - [x] 2.3 Wire go build refresh check (source mtime > binary mtime → rebuild)
 
