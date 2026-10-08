@@ -15,8 +15,13 @@ two route tables and two envelopes is a defect waiting to happen.
   and serves the frontend only.
 - Filesystem-touching commands (`freeconvert compress`, `viewpagesource view`) are marked `LocalOnly` and
   never get an HTTP route — a query string cannot name a server-side path.
-- Client-argument errors answer 400 (`bad_request`); upstream refusals (any upstream 4xx/5xx, WAF) answer
-  502 (`upstream_error`); unknown routes answer 404 — verified across all routes.
+- Client-argument errors answer 400 (`bad_request`); a wrong HTTP verb on a real route answers 405
+  (`method_not_allowed`); upstream refusals (any upstream 4xx/5xx, WAF) answer
+  502 (`upstream_error`); unknown routes answer 404; the token-gated purge answers 401 without a
+  Bearer token and 429 (`rate_limited`) past 5 requests / 10 min per client — verified across all routes.
+- The error classes are a closed set: `apiErrorCodes` in `api_go.go` is the only source, the OpenAPI
+  `ApiError.code` enum is generated from it, and `go test` fails if a handler emits a code that is
+  not declared (or a declared code is never emitted).
 
 ## Contract
 - Exactly **one** public API process: the Go binary (`nontonanime serve`).

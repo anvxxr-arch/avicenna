@@ -22,7 +22,7 @@ const CORE_ROUTES: Array<{ method: string; path: string; params: string; notes: 
   { method: 'GET', path: '/genre', params: 'slug (a-z0-9-), page?', notes: 'genre archive' },
   { method: 'GET', path: '/season', params: 'season, year, page?', notes: 'premiereds archive' },
   { method: 'GET', path: '/more', params: 'offset, ids[]', notes: 'loadmore AJAX; no-store' },
-  { method: 'POST', path: '/admin/purge', params: 'Authorization: Bearer', notes: '404 unless a token is configured' },
+  { method: 'POST', path: '/admin/purge', params: 'Authorization: ***', notes: '404 unless a token is configured; token-gated, 5 per 10 min per client' },
 ];
 
 function Copyable({ text }: { text: string }) {
@@ -73,7 +73,7 @@ export function DocsPage() {
         <Card>
           <CardHeader>
             <CardTitle>error envelope</CardTitle>
-            <CardDescription>400 · 401 · 404 · 405 · 502 · 500</CardDescription>
+            <CardDescription>400 bad_request · 401 unauthorized · 404 not_found · 405 method_not_allowed · 429 rate_limited · 500 internal · 502 upstream_error</CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="text-[11px] text-muted">{`{ "api": "nontonanime-go", "version": "1",

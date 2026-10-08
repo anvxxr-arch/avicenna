@@ -54,8 +54,8 @@ export const SECTIONS: SectionDef[] = [
     endpoints: ['/yt/search', '/yt/info', '/yt/related', '/ytmusic/search', '/ytmusic/info', '/ytmusic/lyrics', '/ytmusic/related'], runtime: 'go', status: 'live', source: 'm.youtube.com',
   },
   {
-    path: '/tiktok', label: 'TikTok', blurb: 'Video stats, no-watermark URLs and public profile data.',
-    endpoints: ['/tiktok/video', '/tiktok/user', '/tiktok/download'], runtime: 'go', status: 'live', source: 'www.tiktok.com',
+    path: '/tiktok', label: 'TikTok', blurb: 'Video stats and public profile data. The no-watermark download is CLI-only (a query string must not name a server-side path).',
+    endpoints: ['/tiktok/video', '/tiktok/user'], runtime: 'go', status: 'live', source: 'www.tiktok.com',
   },
   {
     path: '/instagram', label: 'Instagram', blurb: 'Public post/profile metadata.',

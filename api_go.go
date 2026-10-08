@@ -108,6 +108,20 @@ func apiErr(code, msg string) apiErrorEnvelope {
 	return apiErrorEnvelope{API: apiName, Version: apiVersion, Error: apiErrorInfo{Code: code, Message: msg}}
 }
 
+// apiErrorCodes is the closed set of error classes the API can emit. The
+// OpenAPI `ApiError.code` enum is generated from it, and
+// TestErrorCodeTaxonomy fails the build if a handler invents a code that is
+// not listed here — the spec and the wire format cannot drift apart.
+var apiErrorCodes = []string{
+	"bad_request",        // 400 — missing/invalid param, host-guard rejection
+	"method_not_allowed", // 405 — route exists, HTTP method is wrong
+	"not_found",          // 404 — unknown route or unknown resource
+	"unauthorized",       // 401 — missing/incorrect admin Bearer token
+	"rate_limited",       // 429 — admin purge window exhausted
+	"upstream_error",     // 502 — scrape failed (WAF/HTTP error)
+	"internal",           // 500 — the server failed, not the client
+}
+
 // Payload types for routes that do not map onto a scraper struct.
 type HealthData struct {
 	OK      bool `json:"ok"`
@@ -865,7 +879,7 @@ func (s *apiServer) dispatch(w *apiResponseWriter, r *http.Request, start time.T
 		return
 	}
 	if r.Method != http.MethodGet {
-		s.writeJSON(w, http.StatusMethodNotAllowed, ttlNone, apiErr("bad_request", "GET only"))
+		s.writeJSON(w, http.StatusMethodNotAllowed, ttlNone, apiErr("method_not_allowed", "GET only"))
 		apiLog(r, http.StatusMethodNotAllowed, time.Since(start))
 		return
 	}
@@ -912,7 +926,7 @@ func (s *apiServer) handlePurge(w *apiResponseWriter, r *http.Request, start tim
 		return
 	}
 	if r.Method != http.MethodPost {
-		s.writeJSON(w, http.StatusMethodNotAllowed, ttlNone, apiErr("bad_request", "POST only"))
+		s.writeJSON(w, http.StatusMethodNotAllowed, ttlNone, apiErr("method_not_allowed", "POST only"))
 		apiLog(r, http.StatusMethodNotAllowed, time.Since(start))
 		return
 	}
@@ -1281,7 +1295,7 @@ func apiErrorResponses() map[string]interface{} {
 			"content": apiErrorContent()},
 		"404": map[string]interface{}{"description": "not_found — unknown route or unknown resource",
 			"content": apiErrorContent()},
-		"405": map[string]interface{}{"description": "Method not allowed (GET only)",
+		"405": map[string]interface{}{"description": "method_not_allowed — the route exists but the HTTP method is wrong",
 			"content": apiErrorContent()},
 		"500": map[string]interface{}{"description": "internal",
 			"content": apiErrorContent()},
@@ -1306,7 +1320,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 		"type": "object",
 		"properties": map[string]interface{}{
 			"code": map[string]interface{}{"type": "string",
-				"enum": []string{"bad_request", "not_found", "upstream_error", "internal", "unauthorized"}},
+				"enum": apiErrorCodes},
 			"message": map[string]interface{}{"type": "string"},
 		},
 		"required": []string{"code", "message"},
@@ -1427,7 +1441,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 					"headers": map[string]interface{}{
 						"Retry-After": map[string]interface{}{
 							"description": "Seconds until the client may purge again",
-							"schema":    map[string]interface{}{"type": "integer"},
+							"schema":      map[string]interface{}{"type": "integer"},
 						},
 					},
 					"content": apiErrorContent(),
@@ -1470,7 +1484,9 @@ func buildOpenAPIDoc() map[string]interface{} {
 			"title":   "NontonAnimeID API (Go)",
 			"version": apiVersion,
 			"description": "Go-owned JSON API over the nontonanime scrapers. Every response is wrapped in the " +
-				"`Envelope`; failures use `ErrorEnvelope` with a code of bad_request|not_found|upstream_error|internal. " +
+				"`Envelope`; failures use `ErrorEnvelope` whose `error.code` is one of the classes in the " +
+				"`ApiError` schema enum (bad_request, method_not_allowed, not_found, unauthorized, " +
+				"rate_limited, upstream_error, internal). " +
 				"Cacheable GETs answer `public, max-age=<ttl>, s-maxage=<ttl*2>, stale-while-revalidate=<ttl*4>`; " +
 				"nonce-derived routes (/stream, /resolve, /servers, /more, /health) and every error answer `no-store`.",
 		},

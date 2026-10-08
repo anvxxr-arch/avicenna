@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -146,8 +148,10 @@ func TestGetRouteRejectsOtherMethods(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405", rec.Code)
 	}
-	if code := errorCode(t, decode(t, rec)); code != "bad_request" {
-		t.Errorf("error.code = %q, want bad_request", code)
+	// 405 carries its own class: the request was well-formed, only the verb was
+	// wrong, so bad_request (which means malformed input) would mislead a client.
+	if code := errorCode(t, decode(t, rec)); code != "method_not_allowed" {
+		t.Errorf("error.code = %q, want method_not_allowed", code)
 	}
 }
 
@@ -245,7 +249,7 @@ func TestAdminPurgeIsRateLimitedPerClient(t *testing.T) {
 
 	// a different client is not limited by the first client's window
 	other := call(s, http.MethodPost, apiPurgePath, map[string]string{
-		"Authorization": "Bearer s3cret",
+		"Authorization":   "Bearer s3cret",
 		"X-Forwarded-For": "203.0.113.9",
 	})
 	if other.Code != http.StatusOK {
@@ -406,4 +410,122 @@ func titlesOf(a []TopAnime) []string {
 		out[i] = a[i].Title
 	}
 	return out
+}
+
+// apiSpecEnum pulls the published ApiError.code enum out of the generated
+// OpenAPI document, so a test can compare the spec against the source.
+func apiSpecEnum(t *testing.T) []string {
+	t.Helper()
+	doc := buildOpenAPIDoc()
+	comps, ok := doc["components"].(map[string]interface{})
+	if !ok {
+		t.Fatal("spec has no components")
+	}
+	schemas, ok := comps["schemas"].(map[string]interface{})
+	if !ok {
+		t.Fatal("spec has no components.schemas")
+	}
+	ae, ok := schemas["ApiError"].(map[string]interface{})
+	if !ok {
+		t.Fatal("spec has no ApiError schema")
+	}
+	props, _ := ae["properties"].(map[string]interface{})
+	code, _ := props["code"].(map[string]interface{})
+	enum, ok := code["enum"].([]string)
+	if !ok {
+		t.Fatalf("ApiError.code has no enum: %v", code["enum"])
+	}
+	return enum
+}
+
+// TestErrorCodeTaxonomy pins the error classes to one source of truth. It scans
+// the package source for apiErr("<code>", …) literals — so a handler that
+// invents a new class fails here — and cross-checks that every declared class is
+// both emitted and published. Without it the OpenAPI enum silently lagged the
+// wire format: rate_limited (429) went undocumented and 405 was mislabelled
+// bad_request, telling a client its input was wrong when the verb was.
+func TestErrorCodeTaxonomy(t *testing.T) {
+	declared := map[string]bool{}
+	for _, c := range apiErrorCodes {
+		if declared[c] {
+			t.Errorf("apiErrorCodes lists %q twice", c)
+		}
+		declared[c] = true
+	}
+
+	emit := regexp.MustCompile(`(?:apiErr\(\s*|Code:\s*)"([a-z_]+)"`)
+	found := map[string]string{} // code -> the file that emits it
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read package dir: %v", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		for _, m := range emit.FindAllStringSubmatch(string(src), -1) {
+			found[m[1]] = name
+		}
+	}
+	if len(found) < 3 {
+		t.Fatalf("only %d apiErr( literals found (%v) — the scan is broken, not the code", len(found), found)
+	}
+	for code, file := range found {
+		if !declared[code] {
+			t.Errorf("%s emits error code %q, which is missing from apiErrorCodes — the spec enum would be incomplete", file, code)
+		}
+	}
+	for _, c := range apiErrorCodes {
+		if _, ok := found[c]; !ok {
+			t.Errorf("apiErrorCodes declares %q but no handler emits it", c)
+		}
+	}
+}
+
+// TestOpenAPIErrorEnumMatchesDeclaredCodes proves the published enum is exactly
+// the declared set — not a hand-maintained copy that drifts.
+func TestOpenAPIErrorEnumMatchesDeclaredCodes(t *testing.T) {
+	enum := apiSpecEnum(t)
+	got := map[string]bool{}
+	for _, c := range enum {
+		if got[c] {
+			t.Errorf("spec enum lists %q twice", c)
+		}
+		got[c] = true
+	}
+	for _, c := range apiErrorCodes {
+		if !got[c] {
+			t.Errorf("apiErrorCodes has %q but the spec enum does not publish it", c)
+		}
+	}
+	if len(enum) != len(apiErrorCodes) {
+		t.Errorf("spec enum has %d entries, apiErrorCodes has %d: %v", len(enum), len(apiErrorCodes), enum)
+	}
+}
+
+// TestMethodNotAllowedCarriesItsOwnClass covers the 405 contract on both guards:
+// a wrong verb on a GET route, and a GET on the POST-only admin route.
+func TestMethodNotAllowedCarriesItsOwnClass(t *testing.T) {
+	s := testServer(false, true, "tok")
+
+	rec := call(s, http.MethodPost, apiOpenAPIPath, nil)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST %s = %d, want 405", apiOpenAPIPath, rec.Code)
+	}
+	if code := errorCode(t, decode(t, rec)); code != "method_not_allowed" {
+		t.Errorf("405 on a GET route carries code %q, want method_not_allowed (bad_request means the input was wrong)", code)
+	}
+
+	rec = call(s, http.MethodGet, apiPurgePath, map[string]string{"Authorization": "Bearer tok"})
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET %s = %d, want 405", apiPurgePath, rec.Code)
+	}
+	if code := errorCode(t, decode(t, rec)); code != "method_not_allowed" {
+		t.Errorf("405 on the POST-only route carries code %q, want method_not_allowed", code)
+	}
 }
