@@ -23,6 +23,20 @@ export function currentPath(): string {
   return location.pathname;
 }
 
+/**
+ * Percent-decodes one path segment. A malformed escape (`/anime/%zz`, a URL
+ * anyone can type or a crawler can invent) makes `decodeURIComponent` throw a
+ * URIError, which would take the whole SPA down during render — the raw segment
+ * is the honest fallback.
+ */
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 /** `/anime/:slug` style matcher. Returns named params or null. */
 export function matchRoute(pattern: string, path: string): Params | null {
   const pp = pattern.split('/').filter(Boolean);
@@ -31,7 +45,7 @@ export function matchRoute(pattern: string, path: string): Params | null {
   const params: Params = {};
   for (let i = 0; i < pp.length; i++) {
     const seg = pp[i];
-    if (seg.startsWith(':')) params[seg.slice(1)] = decodeURIComponent(cp[i]);
+    if (seg.startsWith(':')) params[seg.slice(1)] = safeDecode(cp[i]);
     else if (seg !== cp[i]) return null;
   }
   return params;

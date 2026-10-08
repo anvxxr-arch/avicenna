@@ -38,13 +38,14 @@
     "contract": "bun tools/contract.ts --check",
     "contract:capture": "bun tools/contract.ts --capture",
     "web:routes": "bun tools/webroutes.ts --check",
+    "web:test": "bun test web/test",
     "secrets": "bun tools/scan-secrets.ts --all",
     "golden-diff": "bun tools/golden-diff.ts",
     "web:build": "bun web/build.ts",
     "web:dev": "bun web/build.ts --dev && bun web/serve.ts",
     "web": "bun web/serve.ts",
     "typecheck": "bunx tsc --noEmit && bunx tsc --noEmit -p web/tsconfig.json",
-    "check": "bun run typecheck && bun run parity:guards && bun run contract && bun run web:routes && bun run secrets"
+    "check": "bun run typecheck && bun run parity:guards && bun run contract && bun run web:routes && bun run web:test && bun run secrets"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

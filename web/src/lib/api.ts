@@ -7,8 +7,23 @@
  * covers every route.
  */
 
+/**
+ * The error classes the server can answer with — the frontend's copy of
+ * `apiErrorCodes` in `api_go.go`. `bun run web:routes` fails the build when a
+ * class listed here is not one the server actually emits, so the two cannot
+ * drift apart silently.
+ */
+export type ApiErrorCode =
+  | 'bad_request'
+  | 'method_not_allowed'
+  | 'not_found'
+  | 'unauthorized'
+  | 'rate_limited'
+  | 'upstream_error'
+  | 'internal';
+
 export interface ApiError {
-  code: 'bad_request' | 'not_found' | 'upstream_error' | 'internal' | string;
+  code: ApiErrorCode;
   message: string;
 }
 

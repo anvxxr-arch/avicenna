@@ -20,6 +20,7 @@ import { existsSync, statSync, readFileSync } from 'node:fs';
 const API_PREFIX = '/api/v1';
 const GO_BIN = process.env.WEBROUTES_GO_BIN || '/tmp/nn-go';
 const GO_SRC = 'nontonanime.go';
+const FRONTEND_API = 'web/src/lib/api.ts';
 
 /** A route the UI claims, with the file and line that made the claim. */
 interface Claim {
@@ -131,6 +132,25 @@ async function main(): Promise<void> {
     seen.add(full);
     if (!served.has(full)) unknown.push(c);
   }
+
+  // Error-class drift: the frontend keeps its own copy of the server's closed
+  // set (web/src/lib/api.ts, type ApiErrorCode). A class the client lists that
+  // the server never emits would surface as a code nobody documents; a class the
+  // server emits that the client lacks would render as an untyped string.
+  const spec = JSON.parse((await $`${GO_BIN} openapi`.quiet().nothrow()).stdout.toString());
+  const serverCodes: string[] =
+    spec.components?.schemas?.ApiError?.properties?.code?.enum ?? [];
+  const frontendSrc = readFileSync(FRONTEND_API, 'utf8');
+  const union = frontendSrc.match(/export type ApiErrorCode =[\s\S]*?;(?=\n)/);
+  if (!union) failEnv(`ApiErrorCode union not found in ${FRONTEND_API} — has the frontend moved?`);
+  const clientCodes = [...union[0].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  if (clientCodes.length === 0) failEnv(`ApiErrorCode union parsed empty from ${FRONTEND_API}`);
+  const stale = clientCodes.filter((c) => !serverCodes.includes(c));
+  const missing = serverCodes.filter((c) => !clientCodes.includes(c));
+  for (const c of stale) console.error(`[FAIL] ${FRONTEND_API} lists error class "${c}" which the server never emits`);
+  for (const c of missing) console.error(`[FAIL] the server emits error class "${c}" but ${FRONTEND_API} does not list it`);
+  if (stale.length || missing.length) process.exit(1);
+  console.log(`webroutes: error classes in sync — ${serverCodes.length} classes on both sides`);
 
   const unique = [...new Set(claims.map((c) => toFullPath(c.endpoint)))];
   console.log(`webroutes: ${claims.length} claims · ${unique.length} unique endpoints · ${served.size} served routes`);
