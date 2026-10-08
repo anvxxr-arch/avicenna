@@ -302,7 +302,36 @@ func tiktokExtractVideo(item ciMap) map[string]any {
 	}
 }
 
+// tiktokVideoIDRe matches the canonical video URL shape.
 var tiktokVideoIDRe = regexp.MustCompile(`/video/(\d{10,})`)
+
+// tiktokVideoURLRe is the canonical shape a video page fetch must have:
+// https://www.tiktok.com/video/<digits> (a query string is allowed —
+// ?is_copy=1 is how share links arrive).
+var tiktokVideoURLRe = regexp.MustCompile(`^https://www\.tiktok\.com/video/\d{10,}(\?[^#\s]*)?(#.*)?$`)
+
+// tiktokShortLinkRe is the short-link shape a fetch may start from:
+// https://vm.tiktok.com/<token> or https://vt.tiktok.com/<token>. The token is
+// a single path segment (one trailing slash tolerated, as share links carry
+// it) — internal slashes mean traversal/subpath and are out.
+var tiktokShortLinkRe = regexp.MustCompile(`^https://(?:vm|vt)\.tiktok\.com/[A-Za-z0-9._-]+/?(\?[^#\s]*)?(#.*)?$`)
+
+// tiktokValidateVideoURL pins a caller-supplied video URL to the two shapes the
+// fetcher can actually handle — a canonical www.tiktok.com/video/<id> page or a
+// vm./vt. short link. The TS reference (tiktok.ts getVideo) fetches the
+// caller's URL as-is and relies only on the site's host pin; that pin is a
+// registrable-domain rule, so e.g. www.tiktok.com.evil.com passes it. The
+// allowlist in tiktokFetchPage (vm./vt. hosts) then rejects the fetch with a
+// generic "External host rejected" — and a crafted Location on a short link
+// could redirect the fetch to any host on that allowlist. Pinning the shape
+// first makes the rejection happen before any request and makes it specific.
+func tiktokValidateVideoURL(raw string) error {
+	u := strings.TrimSpace(raw)
+	if tiktokVideoURLRe.MatchString(u) || tiktokShortLinkRe.MatchString(u) {
+		return nil
+	}
+	return fmt.Errorf("URL tidak valid: harus https://www.tiktok.com/video/<id> atau https://vm.tiktok.com/<link> (dapat %s)", u)
+}
 
 // tiktokExtractIDFromURL mirrors extractIdFromUrl().
 func tiktokExtractIDFromURL(url string) any {
@@ -312,8 +341,6 @@ func tiktokExtractIDFromURL(url string) any {
 	}
 	return m[1]
 }
-
-var tiktokShortLinkRe = regexp.MustCompile(`vm\.tiktok\.com|vt\.tiktok\.com`)
 
 // tiktokResolveShortLink follows a vm./vt. link one hop, validating the target.
 func tiktokResolveShortLink(url string) string {
@@ -378,6 +405,9 @@ func tiktokFindItemStruct(v any, depth int) ciMap {
 
 // tiktokGetVideo returns the video payload (or an error payload).
 func tiktokGetVideo(url string) (map[string]any, error) {
+	if err := tiktokValidateVideoURL(url); err != nil {
+		return nil, err
+	}
 	fullURL := tiktokResolveShortLink(url)
 	videoID := tiktokExtractIDFromURL(fullURL)
 	cookies, html, err := tiktokFetchPage(fullURL)
