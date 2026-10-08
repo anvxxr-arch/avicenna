@@ -412,6 +412,8 @@ async function capture(scraper: string): Promise<Contract> {
           } catch { /* non-JSON help text: ignore */ }
         }
         cases.push({ args, exit: 0, shape, note, coarse: true, keys: [...keys].sort() });
+        // Do NOT fall through to a shared push below: a second, plain case for the
+        // same args re-imposes the exact union-size check this mode exists to avoid.
       } else if (variant) {
         // These rails mix item kinds across requests, and the rare kinds come and
         // go between runs — measured on `yt search`: video/mix/short in 20/20 runs
@@ -427,14 +429,25 @@ async function capture(scraper: string): Promise<Contract> {
             shape = intersectShapes(shape, shapeOf(JSON.parse(again.stdout)));
           } catch { /* non-JSON help text: ignore */ }
         }
+        cases.push({ args, exit: 0, shape, note, allowVariants: true });
+      } else {
+        cases.push({ args, exit: 0, shape, note });
       }
-      cases.push({ args, exit: 0, shape, note, ...(variant ? { allowVariants: true } : {}) });
     } else {
       if (!r.stderr.trim()) throw new Error(`${scraper} ${args.join(' ')}: exit 1 with empty stderr`);
       cases.push({ args, exit: 1, errorRe: /\[ERROR\]/.source, note });
     }
     const label = args.length ? args.join(' ') : '(no args)';
     console.log(`  ${r.exit === 0 ? '✓' : '✗'} ${scraper} ${label}${note ? `  — ${note}` : ''}`);
+  }
+  // Exactly one case per matrix entry. A duplicate args signature does not
+  // weaken the gate — the older, stricter case keeps checking, so the drift the
+  // new mode was meant to tolerate comes straight back as a failure.
+  const seen = new Set<string>();
+  for (const c of cases) {
+    const sig = c.args.join(' ');
+    if (seen.has(sig)) throw new Error(`${scraper}: duplicate case "${sig}" in the capture matrix`);
+    seen.add(sig);
   }
   return { scraper, capturedAt: new Date().toISOString(), cases };
 }

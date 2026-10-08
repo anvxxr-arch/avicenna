@@ -406,7 +406,53 @@ func NewSite(cfg SiteConfig) *Site {
 		cookies:      map[string]string{},
 		external:     map[string]*Site{},
 	}
+	registerSite(s)
 	return s
+}
+
+// === SITE REGISTRY ===
+//
+// Every Site registers itself so the API's admin purge can reach the response
+// cache of each scraper origin — and of every external child site an origin
+// memoizes (children are created through NewSite, so they register too). The
+// sites are package-level values, so their caches live for the whole process;
+// without a registry there would be nothing for the purge route to clear.
+var (
+	siteRegistryMu sync.Mutex
+	siteRegistry   []*Site
+)
+
+func registerSite(s *Site) {
+	siteRegistryMu.Lock()
+	siteRegistry = append(siteRegistry, s)
+	siteRegistryMu.Unlock()
+}
+
+// Purge drops this site's cached responses and reports how many were dropped.
+// In-flight calls are left alone on purpose: their waiters still receive their
+// result, and clearing the map would only allow a duplicate fetch of the same
+// URL — the opposite of what a dedupe table is for.
+func (s *Site) Purge() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := len(s.cache)
+	s.cache = map[string]cacheEntry{}
+	s.order = nil
+	return n
+}
+
+// PurgeAll purges every registered site and returns the total number of cached
+// responses dropped. It takes each site's own lock, so it is safe to call while
+// requests are being served.
+func PurgeAll() int {
+	siteRegistryMu.Lock()
+	sites := append([]*Site(nil), siteRegistry...)
+	siteRegistryMu.Unlock()
+	total := 0
+	for _, s := range sites {
+		total += s.Purge()
+	}
+	return total
 }
 
 // Base returns the pinned origin (no trailing slash).

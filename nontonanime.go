@@ -433,6 +433,18 @@ func cacheSet(k, v string) {
 	}
 }
 
+// purgePageCache drops every cached response of the primary origin and reports
+// how many entries it evicted. The cache is package-level, so it outlives any
+// request; the admin purge route is the only way to drop it without a restart.
+func purgePageCache() int {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	n := len(cache)
+	cache = map[string]cacheEntry{}
+	cacheOrd = nil
+	return n
+}
+
 // === CORE FETCH ===
 var httpClient = &http.Client{
 	Timeout: time.Duration(timeoutMS) * time.Millisecond,
@@ -1877,8 +1889,17 @@ func getTopAnime() ([]TopAnime, error) {
 	for _, k := range order {
 		out = append(out, seen[k])
 	}
-	sort.SliceStable(out, func(i, j int) bool { return parseNumOr0(out[i].Score) > parseNumOr0(out[j].Score) })
+	sort.SliceStable(out, func(i, j int) bool { return topScoreLess(out[i], out[j]) })
 	return out, nil
+}
+
+// topScoreLess orders TopAnime by score, descending. A missing/unparseable score
+// must coerce to 0 (`parseFloat(x) || 0`), never NaN: a NaN operand makes the
+// comparator non-transitive, and sort.SliceStable then leaves the slice partly
+// unsorted instead of reporting anything. That was a real cross-runtime parity
+// failure — `top` disagreed with the TS reference and the Rust port.
+func topScoreLess(a, b TopAnime) bool {
+	return parseNumOr0(a.Score) > parseNumOr0(b.Score)
 }
 
 var seasons = map[string]bool{"spring": true, "summer": true, "fall": true, "autumn": true, "winter": true}

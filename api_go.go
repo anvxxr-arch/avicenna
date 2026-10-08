@@ -890,9 +890,12 @@ func (s *apiServer) handlePurge(w *apiResponseWriter, r *http.Request, start tim
 		apiLog(r, http.StatusUnauthorized, time.Since(start))
 		return
 	}
-	// The Go server keeps no origin LRU of its own (the scraper's page cache is
-	// internal and not introspectable) — report 0 rather than invent numbers.
-	s.writeJSON(w, http.StatusOK, ttlNone, apiData(PurgeData{Purged: 0}))
+	// Two caches back the API: the primary origin's page cache (package main)
+	// and one response cache per scraper Site (package scrapers, children
+	// included). Both are package-level, so both outlive any request — purge
+	// both and report the real total instead of inventing a number.
+	purged := purgePageCache() + scrapers.PurgeAll()
+	s.writeJSON(w, http.StatusOK, ttlNone, apiData(PurgeData{Purged: purged}))
 	apiLog(r, http.StatusOK, time.Since(start))
 }
 
@@ -1249,7 +1252,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 		"type": "object",
 		"properties": map[string]interface{}{
 			"purged": map[string]interface{}{"type": "integer",
-				"description": "Entries evicted (always 0 — the Go server keeps no origin LRU)"},
+				"description": "Cached responses evicted across every scraper origin and each external child site it memoized"},
 		},
 		"required": []string{"purged"},
 	}
@@ -1336,7 +1339,7 @@ func buildOpenAPIDoc() map[string]interface{} {
 			"security":    []interface{}{map[string]interface{}{"bearerAuth": []interface{}{}}},
 			"responses": map[string]interface{}{
 				"200": map[string]interface{}{
-					"description": "Purge report (purged is always 0 — no origin LRU)",
+					"description": "Purge report — the number of cached responses evicted (0 when nothing was cached)",
 					"content": map[string]interface{}{
 						"application/json": map[string]interface{}{
 							"schema": map[string]interface{}{"$ref": "#/components/schemas/PurgeResponse"},
