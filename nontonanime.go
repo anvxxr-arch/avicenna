@@ -852,7 +852,11 @@ func extractPageVar(html string, varNames ...string) map[string]interface{} {
 		}
 	})
 	doc.Find("script:not([src])").Each(func(_ int, el *goquery.Selection) {
-		t, _ := el.Html()
+		// el.Text(), NOT el.Html(): goquery re-serialises through x/net/html, which
+		// escapes `"` to `&#34;` and turns the inline JS into invalid JSON, so the
+		// fallback could never match. cheerio's .html() in the TS reference returns
+		// the raw text, which is what this branch has to mirror.
+		t := el.Text()
 		for _, v := range varNames {
 			if strings.Contains(t, v) {
 				scripts = append(scripts, base64.StdEncoding.EncodeToString([]byte(t)))

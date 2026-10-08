@@ -458,12 +458,22 @@ fn trunc16(s: &str, max: usize) -> String {
 fn num_in(s: &str) -> String {
     s.chars().filter(|c| c.is_ascii_digit() || *c == '.').collect::<String>().trim().to_string()
 }
-fn opt(s: String) -> Value {
-    if s.is_empty() {
-        Value::Null
-    } else {
-        Value::String(s)
-    }
+/// A card's score as a sort key. Mirrors TS `parseFloat(x) || 0` and the Go
+/// `parseNumOr0`: it must never yield NaN, because a NaN key makes the
+/// comparator non-total and leaves the slice partly unsorted — that was the real
+/// `top` cross-runtime parity failure on the Go side. Non-finite parses are
+/// coerced to 0.0 the same way TS coerces NaN.
+fn score_key(v: &Value, field: &str) -> f64 {
+    v.get(field)
+        .and_then(|x| x.as_str())
+        .and_then(|s| s.trim().parse::<f64>().ok())
+        .filter(|f| f.is_finite())
+        .unwrap_or(0.0)
+}
+/// Descending order by a score field. `score_key` never yields NaN, so this is a
+/// total order: `sort_by` is stable and the result is deterministic.
+fn cmp_score_desc(a: &Value, b: &Value, field: &str) -> std::cmp::Ordering {
+    score_key(b, field).partial_cmp(&score_key(a, field)).unwrap_or(std::cmp::Ordering::Equal)
 }
 fn img_of(el: scraper::ElementRef) -> String {
     let img = el.select(&sel("img")).next();
@@ -847,12 +857,8 @@ async fn genre_fallback(opts: &HashMap<String, String>) -> Result<Value, String>
         })
         .collect();
     match opts.get("sort").map(|s| s.as_str()) {
-        Some("series_skor") => res.sort_by(|a, b| {
-            // TS semantics: parseFloat(x) || 0
-            let ra: f64 = a.get("rating").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
-            let rb: f64 = b.get("rating").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
-            rb.partial_cmp(&ra).unwrap()
-        }),
+        // TS semantics: parseFloat(x) || 0 — see score_key for the coercion.
+        Some("series_skor") => res.sort_by(|a, b| cmp_score_desc(a, b, "rating")),
         Some("series_title") => res.sort_by(|a, b| {
             a.get("title").and_then(|v| v.as_str()).unwrap_or("").cmp(b.get("title").and_then(|v| v.as_str()).unwrap_or(""))
         }),
@@ -970,7 +976,7 @@ async fn get_anime_detail(raw: &str) -> Result<Value, String> {
         "recommended": parse_as_cards(&doc, ".related .as-anime-card"),
     }))
 }
-async fn episode_servers(site: &str, doc: &Html, html: &str) -> Result<(Vec<Value>, String, String, String), String> {
+async fn episode_servers(_site: &str, doc: &Html, html: &str) -> Result<(Vec<Value>, String, String, String), String> {
     let mut servers = vec![];
     let mut post = String::new();
     for el in doc.select(&sel("li.serverplayer")) {
@@ -1410,11 +1416,7 @@ async fn get_top() -> Result<Value, String> {
         }));
     }
     let mut out: Vec<Value> = order.into_iter().filter_map(|k| seen.remove(&k)).collect();
-    out.sort_by(|a, b| {
-        let ra: f64 = a.get("score").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
-        let rb: f64 = b.get("score").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
-        rb.partial_cmp(&ra).unwrap()
-    });
+    out.sort_by(|a, b| cmp_score_desc(a, b, "score"));
     Ok(Value::Array(out))
 }
 async fn get_season(season: &str, year: i64, page: i64) -> Result<Value, String> {
@@ -1607,3 +1609,155 @@ async fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn doc(html: &str) -> Html {
+        Html::parse_document(html)
+    }
+
+    // --- the NaN class: a score key must never be NaN -------------------------
+
+    #[test]
+    fn score_key_never_returns_nan() {
+        for v in [Value::Null, json!(""), json!("   "), json!("abc"), json!("NaN"), json!("inf")] {
+            let k = score_key(&json!({ "score": v }), "score");
+            assert!(!k.is_nan(), "score_key must never be NaN, got {k} for {v}");
+            assert_eq!(k, 0.0, "unparseable score {v} must coerce to 0.0");
+        }
+        assert_eq!(score_key(&json!({ "score": "8.43" }), "score"), 8.43);
+        assert_eq!(score_key(&json!({ "score": " 7.76 " }), "score"), 7.76);
+        // a missing field is 0.0, not Null-handling panic
+        assert_eq!(score_key(&json!({ "title": "x" }), "score"), 0.0);
+    }
+
+    #[test]
+    fn missing_score_sorts_last_not_in_the_middle() {
+        let c = |t: &str, s: Value| json!({ "title": t, "score": s });
+        let mut v = vec![
+            c("Black Clover 2nd Season", json!("8.83")),
+            c("Tokyo Revengers", json!("7.76")),
+            c("Tensei Ken II", json!("7.54")),
+            c("Kikansha 2nd Season", Value::Null),
+            c("Koori no Jouheki 2nd Season", json!("8.42")),
+            c("Ao no Hako Season 2", json!("8.20")),
+        ];
+        v.sort_by(|a, b| cmp_score_desc(a, b, "score"));
+        let got: Vec<&str> = v.iter().map(|x| x["title"].as_str().unwrap()).collect();
+        assert_eq!(
+            got,
+            vec![
+                "Black Clover 2nd Season",
+                "Koori no Jouheki 2nd Season",
+                "Ao no Hako Season 2",
+                "Tokyo Revengers",
+                "Tensei Ken II",
+                "Kikansha 2nd Season",
+            ]
+        );
+    }
+
+    // --- guards ---------------------------------------------------------------
+
+    #[test]
+    fn clean_slug_rejects_traversal_and_junk() {
+        for bad in ["", "   ", "../etc", "..%2f..", "a/b", "A B", "slug?x=1", "slug#f", "日本"] {
+            assert!(clean_slug(bad).is_err(), "clean_slug({bad:?}) must fail");
+        }
+        assert_eq!(clean_slug("Family-Control").unwrap(), "family-control");
+        assert_eq!(clean_slug(" eleceed-chapter-420 ").unwrap(), "eleceed-chapter-420");
+        assert_eq!(clean_slug("9").unwrap(), "9");
+    }
+
+    #[test]
+    fn clean_query_collapses_whitespace_and_requires_two_units() {
+        for bad in ["", " ", "a"] {
+            assert!(clean_query(bad).is_err(), "clean_query({bad:?}) must fail");
+        }
+        assert_eq!(clean_query("  one   piece  ").unwrap(), "one piece");
+    }
+
+    #[test]
+    fn clamp_page_bounds() {
+        assert_eq!(clamp_page(0), 1);
+        assert_eq!(clamp_page(-3), 1);
+        assert_eq!(clamp_page(7), 7);
+        assert_eq!(clamp_page(99), 50);
+    }
+
+    #[test]
+    fn trunc16_and_txt_match_js_semantics() {
+        assert_eq!(n16("😀"), 2, "an astral rune counts as two UTF-16 units");
+        assert_eq!(trunc16("😀😀😀", 4), "😀😀", "clamping must never split a rune");
+        assert_eq!(trunc16("abcdef", 3), "abc");
+        assert_eq!(txt("  a   b  ", 50), "a b");
+    }
+
+    // --- parsers (offline fixtures, no network) --------------------------------
+
+    #[test]
+    fn article_grid_extracts_and_drops_incomplete() {
+        let html = r#"<html><body>
+        <article class="animeseries"><a href="/series/one-piece/">
+          <div class="title"><span data-title-default="One Piece"></span></div>
+          <div class="episodes"> Episode 1100 </div>
+          <img data-src="/img/op.jpg" src="/img/fallback.jpg">
+        </a></article>
+        <article class="animeseries"><a href="/series/no-title/"><div class="title"><span></span></div></a></article>
+        <article class="animeseries"><a href=""><div class="title"><span>No href</span></div></a></article>
+        </body></html>"#;
+        let eps = parse_article_grid(&doc(html));
+        assert_eq!(eps.len(), 1, "only the complete row survives: {eps:?}");
+        assert_eq!(eps[0]["title"], json!("One Piece"));
+        assert_eq!(eps[0]["episode"], json!("1100"));
+        assert_eq!(eps[0]["url"], json!("/series/one-piece/"));
+        assert_eq!(eps[0]["thumbnail"], json!("/img/op.jpg"), "data-src wins over src");
+    }
+
+    #[test]
+    fn as_cards_keep_optional_fields_optional() {
+        let html = r#"<html><body>
+        <a class="as-anime-card" href="/anime/bleach/">
+          <img data-src="/img/bleach.jpg">
+          <div class="as-anime-title" data-title-default="Bleach"></div>
+          <div class="as-rating"> 8.24 </div>
+          <div class="as-genres"><span>Action</span><span>Shounen</span></div>
+        </a>
+        <a class="as-anime-card" href="/anime/plain/">
+          <div class="as-anime-title" data-title-default="Plain"></div>
+        </a>
+        <div class="as-anime-card"><div class="as-anime-title" data-title-default="No href"></div></div>
+        </body></html>"#;
+        let cards = parse_as_cards(&doc(html), "");
+        assert_eq!(cards.len(), 2, "a card with no url must be dropped: {cards:?}");
+        assert_eq!(cards[0]["title"], json!("Bleach"));
+        assert_eq!(cards[0]["url"], json!("/anime/bleach/"));
+        assert_eq!(cards[0]["thumbnail"], json!("/img/bleach.jpg"));
+        assert_eq!(cards[0]["rating"], json!("8.24"));
+        assert_eq!(cards[0]["genres"], json!(["Action", "Shounen"]));
+        for f in ["rating", "type", "season", "synopsis", "genres"] {
+            assert!(cards[1].get(f).is_none(), "card without {f} must omit it: {}", cards[1]);
+        }
+    }
+
+    #[test]
+    fn embed_url_prefers_iframe_then_video_then_raw_url() {
+        assert_eq!(
+            extract_embed_url(r#"<html><iframe src="https://e/1.mp4"></iframe></html>"#),
+            "https://e/1.mp4"
+        );
+        assert_eq!(
+            extract_embed_url(r#"<html><iframe data-src="https://e/2.mp4"></iframe></html>"#),
+            "https://e/2.mp4"
+        );
+        assert_eq!(
+            extract_embed_url(r#"<html><video><source src="https://e/3.mp4"></video></html>"#),
+            "https://e/3.mp4"
+        );
+        assert_eq!(extract_embed_url("try https://e/5.mp4 instead"), "https://e/5.mp4");
+        assert_eq!(extract_embed_url("<html><p>no player</p></html>"), "");
+    }
+}
+
