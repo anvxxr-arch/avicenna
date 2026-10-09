@@ -652,15 +652,21 @@ func shBatchFromDoc(doc *goquery.Document, slug, pageURL string) map[string]any 
 
 var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)
 
-// The site's own mobile-client API (`/wp-json/apk/*`): search returns the numeric
-// post ids that `/apk/episode?id=` consumes, so the pair is the cheapest path
-// from a title to a mirror list — no HTML, no nonce, no player_ajax.
+// The site's mobile-client API used to be `/wp-json/apk/*`, but the site has deleted
+// `/apk/search` and `/apk/episode` — both 404 from WordPress itself, identically in
+// both ports — while `/apk/latest` and `/apk/schedule` still answer. The core REST
+// index keeps handing out exactly what this pair was built for, numeric ids of episode
+// posts, so both commands read it now: `apksearch` ->
+// /wp-json/wp/v2/search?search=<q>&subtype=post, and `apk` -> /wp-json/wp/v2/posts/<id>.
+// `subtype=post` is what keeps every id `apksearch` returns consumable by `apk`:
+// episode posts are regular posts (type and subtype both "post"), the same ids
+// `/apk/latest` reports.
 func shApkSearch(query string) (map[string]any, error) {
 	q := Txt(query, 100)
 	if n16(q) < 2 {
 		return nil, errors.New("Query too short")
 	}
-	raw, err := shSite.Fetch("/wp-json/apk/search?s=" + shEncode(q))
+	raw, err := shSite.Fetch("/wp-json/wp/v2/search?search=" + shEncode(q) + "&subtype=post&per_page=100")
 	if err != nil {
 		return nil, err
 	}
@@ -683,13 +689,13 @@ func shApkSearch(query string) (map[string]any, error) {
 	return out, nil
 }
 
-// shApkEpisode returns one episode record from the mobile API.
+// shApkEpisode returns one episode post from the REST index, by numeric id.
 func shApkEpisode(id string) (map[string]any, error) {
 	clean := shDigitsOnly(id)
 	if clean == "" {
 		return nil, errors.New("Numeric post id required")
 	}
-	raw, err := shSite.Fetch("/wp-json/apk/episode?id=" + clean)
+	raw, err := shSite.Fetch("/wp-json/wp/v2/posts/" + clean)
 	if err != nil {
 		return nil, err
 	}

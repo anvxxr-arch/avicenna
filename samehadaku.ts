@@ -441,23 +441,32 @@ async function batch(rawSlug: string): Promise<Rec> {
 }
 
 /**
- * The site's own mobile-client API (`/wp-json/apk/*`). Its search returns the
- * numeric post ids that `/apk/episode?id=` consumes, so the pair is the cheapest
- * path from a title to a mirror list — no HTML, no nonce, no player_ajax.
+ * The site's mobile-client API used to be `/wp-json/apk/*`, but the site has deleted
+ * `/apk/search` and `/apk/episode` — both 404 from WordPress itself, identically on
+ * every client — while `/apk/latest` and `/apk/schedule` still answer. The core REST
+ * index keeps handing out exactly what this pair was built for, numeric ids of episode
+ * posts, so both commands read it now:
+ *
+ *   apksearch <q>  -> /wp-json/wp/v2/search?search=<q>&subtype=post
+ *   apk <id>       -> /wp-json/wp/v2/posts/<id>
+ *
+ * `subtype=post` is what keeps every id `apksearch` returns consumable by `apk`:
+ * episode posts are regular posts (`type` and `subtype` both "post"), the same ids
+ * `/apk/latest` reports.
  */
 async function apkSearch(query: string): Promise<Rec> {
   const q = txt(query, 100);
   if (q.length < 2) throw new Error('Query too short');
-  const parsed = JSON.parse(await fetchPage(`/wp-json/apk/search?s=${encodeURIComponent(q)}`)) as Rec[] | { error?: string };
+  const parsed = JSON.parse(await fetchPage(`/wp-json/wp/v2/search?search=${encodeURIComponent(q)}&subtype=post&per_page=100`)) as Rec[] | { error?: string };
   const results = Array.isArray(parsed) ? parsed : [];
   return { query: q, count: results.length, results, ...(Array.isArray(parsed) ? {} : { note: String(parsed.error ?? '') }) };
 }
 
-/** `apk <id>`: one episode record from the mobile API (players, prev, thumb). */
+/** `apk <id>`: one episode post from the REST index, by numeric id. */
 async function apkEpisode(id: string): Promise<Rec> {
   const clean = String(id || '').replace(/[^0-9]/g, '');
   if (!clean) throw new Error('Numeric post id required');
-  return JSON.parse(await fetchPage(`/wp-json/apk/episode?id=${clean}`)) as Rec;
+  return JSON.parse(await fetchPage(`/wp-json/wp/v2/posts/${clean}`)) as Rec;
 }
 
 const SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
