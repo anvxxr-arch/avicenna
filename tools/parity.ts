@@ -69,9 +69,18 @@ const CASES: Case[] = [
   // and CDN avatar URLs verified stable across repeated runs). The Rust port
   // covers the nontonanime surface only, so it is n/a here.
   { name: 'tiktok-user', args: ['tiktok', 'user', 'tiktok'], skip: ['rs'], tsFile: 'tiktok.ts', tsDrop: 1 },
-  // spotify: a search response carries only stable fields (id/name/uri/year —
-  // no play counters in this shape), so it is safe as a live row.
-  { name: 'spotify-search', args: ['spotify', 'search', 'daft punk'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // spotify: the payload carries only stable fields (id/name/uri/year — no play
+  // counters), but Spotify's relevance ranking jitters: the LANY / "Daft Poets
+  // Society" pair at the tail flips order between runs, so index 4 disagreed
+  // across ports on a live run. Nonce-like, not a parser divergence — pinned to
+  // a shape comparison like resolve/stream.
+  { name: 'spotify-search', args: ['spotify', 'search', 'daft punk'], volatile: [['$']], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // anilist: anilist.co is an SPA, so the HTML scrape path is a no-op by design
+  // on BOTH ports (`[]` + a stderr note). Kept deliberately: if one port ever
+  // gains the GraphQL path without the other, this row stops being
+  // empty-consistent and turns into a mismatch. Reported as `empty-consistent`,
+  // never as a pass, so it cannot inflate the pass count.
+  { name: 'anilist-search', args: ['anilist', 'search', 'frieren'], skip: ['rs'], tsFile: 'anilist.ts', tsDrop: 1 },
   // Remaining scraper surfaces with a Go counterpart. Deep-equal verified and
   // two-run stable before landing; each TS CLI is a single-scraper entrypoint,
   // so it reuses tsFile/tsDrop. The Rust port covers nontonanime only.
@@ -94,6 +103,51 @@ const CASES: Case[] = [
   { name: 'samehadaku-list', args: ['samehadaku', 'list'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
   { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
+  // Second expansion wave: every remaining Go/TS surface, each deep-equal and
+  // two-run stable before landing. `detail`/`chapter` rows use stable public
+  // fixtures (a long-running series), never a slug that rotates weekly.
+  { name: 'animeindo-home', args: ['animeindo', 'home'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-genrelist', args: ['animeindo', 'genrelist'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-movies', args: ['animeindo', 'movies'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-jadwal', args: ['animeindo', 'jadwal'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-search', args: ['animeindo', 'search', 'one piece'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-supported', args: ['animeindo', 'supported'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-detail', args: ['animeindo', 'detail', 'one-piece'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-batch', args: ['animeindo', 'batch', 'one-piece'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'kanzenin-home', args: ['kanzenin', 'home'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-genrelist', args: ['kanzenin', 'genrelist'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-search', args: ['kanzenin', 'search', 'family control'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-supported', args: ['kanzenin', 'supported'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-azlist', args: ['kanzenin', 'azlist', 'A'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-detail', args: ['kanzenin', 'detail', 'family-control'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'kanzenin-chapter', args: ['kanzenin', 'chapter', 'family-control-chapter-5'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'mangasusuku-home', args: ['mangasusuku', 'home'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-genrelist', args: ['mangasusuku', 'genrelist'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-search', args: ['mangasusuku', 'search', 'solo leveling'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-supported', args: ['mangasusuku', 'supported'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-azlist', args: ['mangasusuku', 'azlist', 'A'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-detail', args: ['mangasusuku', 'detail', 'solo-leveling'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'mangasusuku-chapter', args: ['mangasusuku', 'chapter', 'solo-leveling-chapter-155'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'ngomik-home', args: ['ngomik', 'home'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'ngomik-genrelist', args: ['ngomik', 'genrelist'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'ngomik-search', args: ['ngomik', 'search', 'eleceed'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'ngomik-supported', args: ['ngomik', 'supported'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'ngomik-detail', args: ['ngomik', 'detail', 'eleceed'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'ngomik-chapter', args: ['ngomik', 'chapter', 'eleceed-chapter-420'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'sankanime-home', args: ['sankanime', 'home'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-populer', args: ['sankanime', 'populer'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-terbaru', args: ['sankanime', 'terbaru'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-genrelist', args: ['sankanime', 'genrelist'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-search', args: ['sankanime', 'search', 'naruto'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-supported', args: ['sankanime', 'supported'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-detail', args: ['sankanime', 'detail', 'naruto-konohas-story-the-steam-ninja-scrolls'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'sankanime-chapter', args: ['sankanime', 'chapter', 'naruto-konohas-story-the-steam-ninja-scrolls-chapter-15'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'yt-info', args: ['yt', 'info', 'dQw4w9WgXcQ'], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
+  { name: 'ytmusic-lyrics', args: ['ytmusic', 'lyrics', 'onCZOgWlr1U'], skip: ['rs'], tsFile: 'ytmusic.ts', tsDrop: 1 },
+  { name: 'otakudesu-ongoing', args: ['otakudesu', 'ongoing'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-complete', args: ['otakudesu', 'complete'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'whitehouse-detail', args: ['whitehouse', 'detail', 'https://www.whitehouse.gov/news/'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'lk21-detail', args: ['lk21', 'detail', 'night-nurse-2026'], skip: ['rs'], tsFile: 'lk21.ts', tsDrop: 1 },
 ];
 
 // === GUARDS (offline) — reject semantics: exit 1 + non-empty stderr.
