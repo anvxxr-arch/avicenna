@@ -154,7 +154,8 @@ func shPostShowCard(sel *goquery.Selection) map[string]any {
 	return out
 }
 
-// shAnimpostCard parses one `article.animpost` (search result) card.
+// shAnimpostCard parses one search-result card. The site renamed the class
+// `animpost` → `animepost`; shSearchCardSel accepts both.
 func shAnimpostCard(sel *goquery.Selection) map[string]any {
 	a := sel.Find(`a[href*="/anime/"]`).First()
 	href, ok := a.Attr("href")
@@ -216,6 +217,14 @@ func shAtoi(s string) int {
 	return n
 }
 
+// shSearchCardSel matches a search-result card. The site renamed the class from
+// `animpost` to `animepost` (live capture 2026-10-08: `article.animepost`), and
+// the parser had been written against a fixture that still carried the old
+// spelling — so `samehadaku search` silently returned zero results live while
+// the fixture test stayed green. Both spellings are accepted now; the test uses
+// this same constant so it cannot drift from the production selector again.
+const shSearchCardSel = "article.animpost, article.animepost"
+
 // shSearch mirrors search().
 func shSearch(query string) (map[string]any, error) {
 	q := Txt(query, 100)
@@ -229,7 +238,7 @@ func shSearch(query string) (map[string]any, error) {
 		return nil, err
 	}
 	results := []any{}
-	doc.Find("article.animpost").Each(func(_ int, el *goquery.Selection) {
+	doc.Find(shSearchCardSel).Each(func(_ int, el *goquery.Selection) {
 		if c := shAnimpostCard(el); c != nil {
 			results = append(results, c)
 		}

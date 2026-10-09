@@ -10,6 +10,7 @@ pins the parsers against these instead.
 | `home.html` | `/` | `div.post-show` |
 | `list.html` | `/anime-terbaru/` | `div.post-show` + `.pagination` |
 | `search.html` | `/?s=one piece` | `.content-area` (`article.animpost`) |
+| `search-live.html` | `/?s=one piece` (2026-10-08) | `.content-area` (`article.animepost`) |
 | `detail.html` | `/anime/one-piece/` | `.infoanime`, `.whites.lsteps`, `.listbatch` |
 | `episode.html` | `/one-piece-episode-1180/` | `.server_option`, `#downloadb` |
 | `episode-head.html` | same | `h1.entry-title`, `.naveps` |

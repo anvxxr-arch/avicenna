@@ -59,7 +59,7 @@ func TestSamehadakuHomeCards(t *testing.T) {
 func TestSamehadakuSearchCards(t *testing.T) {
 	doc := shFixture(t, "search.html")
 	results := []map[string]any{}
-	doc.Find("article.animpost").Each(func(_ int, el *goquery.Selection) {
+	doc.Find(shSearchCardSel).Each(func(_ int, el *goquery.Selection) {
 		if c := shAnimpostCard(el); c != nil {
 			results = append(results, c)
 		}
@@ -86,6 +86,44 @@ func TestSamehadakuSearchCards(t *testing.T) {
 	}
 	if first["views"] != "3378" {
 		t.Errorf("views = %v", first["views"])
+	}
+}
+
+// Live capture (2026-10-08) of `/?s=one piece`: the site now emits
+// `article.animepost` (no extra "i") and most cards link to episodes/batches.
+// The card parser intentionally keeps only `/anime/` series links, so a page of
+// 20 articles yields exactly one card — the same rule the TS reference applies.
+// Before the class fix this fixture produced zero cards, which is precisely the
+// silent empty result the live command was returning.
+func TestSamehadakuSearchCardsLiveMarkup(t *testing.T) {
+	doc := shFixture(t, "search-live.html")
+	results := []map[string]any{}
+	doc.Find(shSearchCardSel).Each(func(_ int, el *goquery.Selection) {
+		if c := shAnimpostCard(el); c != nil {
+			results = append(results, c)
+		}
+	})
+	if len(results) != 1 {
+		t.Fatalf("results = %d, want 1 (only /anime/ series links count)", len(results))
+	}
+	first := results[0]
+	if first["title"] != "One Piece: Heroines" || first["slug"] != "one-piece-heroines" {
+		t.Errorf("title/slug = %v / %v", first["title"], first["slug"])
+	}
+	if first["score"] != "7.58" {
+		t.Errorf("score = %v", first["score"])
+	}
+	if first["status"] != "Completed" {
+		t.Errorf("status = %v", first["status"])
+	}
+	if genres, _ := first["genres"].([]any); len(genres) != 4 {
+		t.Errorf("genres = %v", genres)
+	}
+	// Episode and batch links must be skipped, not merely parsed badly.
+	for _, c := range results {
+		if url, _ := c["url"].(string); !strings.Contains(url, "/anime/") {
+			t.Errorf("card kept a non-anime url: %v", url)
+		}
 	}
 }
 

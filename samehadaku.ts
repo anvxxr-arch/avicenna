@@ -82,7 +82,7 @@ function parsePostShowCard($: CheerioAPI, el: unknown): Rec | null {
   };
 }
 
-/** One `article.animpost` card (search results). */
+/** One search-result card. The site renamed the class `animpost` → `animepost`; both are accepted. */
 function parseAnimpostCard($: CheerioAPI, el: unknown): Rec | null {
   const $el = $(el as never);
   const a = $el.find('a[href*="/anime/"]').first();
@@ -106,6 +106,9 @@ function parseAnimpostCard($: CheerioAPI, el: unknown): Rec | null {
   };
 }
 
+/** Search-result card selector. The site renamed `animpost` → `animepost`; accept both. */
+const SH_SEARCH_CARD = 'article.animpost, article.animepost';
+
 /** `?s=` search: results + the "Results found" count. */
 async function search(query: string): Promise<Rec> {
   const q = String(query || '').replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -113,7 +116,7 @@ async function search(query: string): Promise<Rec> {
   const url = `${BASE}/?s=${encodeURIComponent(q)}`;
   const $ = safeCheerio(await fetchPage(url));
   const results: Rec[] = [];
-  $('article.animpost').each((_, el) => {
+  $(SH_SEARCH_CARD).each((_, el) => {
     const c = parseAnimpostCard($, el);
     if (c) results.push(c);
   });
