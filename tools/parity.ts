@@ -72,6 +72,28 @@ const CASES: Case[] = [
   // spotify: a search response carries only stable fields (id/name/uri/year —
   // no play counters in this shape), so it is safe as a live row.
   { name: 'spotify-search', args: ['spotify', 'search', 'daft punk'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // Remaining scraper surfaces with a Go counterpart. Deep-equal verified and
+  // two-run stable before landing; each TS CLI is a single-scraper entrypoint,
+  // so it reuses tsFile/tsDrop. The Rust port covers nontonanime only.
+  //
+  // lk21 earned its place the hard way: Go injected origin/referer on every
+  // request while TS sends them only for POSTs, and this CDN keys a cache entry
+  // on Origin — so a GET read a different, differently-aged body and this row
+  // caught a one-vote ratingCount drift (6710 vs 6711) that nothing else saw.
+  { name: 'lk21-list', args: ['lk21', 'list'], skip: ['rs'], tsFile: 'lk21.ts', tsDrop: 1 },
+  { name: 'lk21-sections', args: ['lk21', 'sections'], skip: ['rs'], tsFile: 'lk21.ts', tsDrop: 1 },
+  { name: 'whitehouse-home', args: ['whitehouse', 'home'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-search', args: ['whitehouse', 'search', 'biden'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-administration', args: ['whitehouse', 'administration'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-news', args: ['whitehouse', 'news'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-videos', args: ['whitehouse', 'videos'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'otakudesu-home', args: ['otakudesu', 'home'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-search', args: ['otakudesu', 'search', 'naruto'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-genrelist', args: ['otakudesu', 'genrelist'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-jadwal', args: ['otakudesu', 'jadwal'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'samehadaku-list', args: ['samehadaku', 'list'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
 ];
 
 // === GUARDS (offline) — reject semantics: exit 1 + non-empty stderr.

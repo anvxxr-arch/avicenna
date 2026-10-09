@@ -4,7 +4,9 @@
 
 **Created**: 2026-09-09
 
-**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 89 pass / 0 fail / 0 skip-waf / 8 n/a). The n/a rows are the tiktok and spotify surfaces, which the Rust port does not implement (reported as n/a, not failed — see `skip` in `tools/parity.ts`).
+**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 111 rows: 95 pass / 0 fail / 0 skip-waf / 16 n/a; guards separately 28 rows: 22 pass / 0 fail / 6 n/a). The n/a rows are the surfaces the Rust port does not implement (tiktok, spotify, lk21, whitehouse, otakudesu, samehadaku, drowify, codeengo — Rust covers nontonanime only), reported as n/a rather than failed via `skip` in `tools/parity.ts`.
+
+**Contract finding (2026-10-08)**: expanding the suite to `lk21` caught a real cross-port divergence the earlier rows could not see. Go's `applyHeaders` injected `origin`/`referer` on *every* request; the TS reference (`core/fetch.ts`) sends them only for POSTs, so a Go GET differed from a TS GET on the wire. That CDN keys a Cloudflare cache entry on `Origin`, so the two ports read *different, differently-aged* bodies for the same URL and `lk21 list` disagreed on one vote counter (6710 vs 6711, `age=3793` vs `age=1731`). Go now gates those headers on POST, matching the reference; both lk21 rows are byte-identical and `scrapers/transport_headers_test.go` locks the contract.
 
 **Input**: User description: "Automated parity test suite proving nontonanime.ts, nontonanime.go, and nontonanime-rs produce identical behavior — command surface, JSON shapes, guard behavior, and live-site results."
 

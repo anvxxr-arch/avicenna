@@ -657,15 +657,23 @@ func (s *Site) allowedRedirectHost(host string, extra []string) bool {
 	return false
 }
 
-// applyHeaders sets the site defaults, per-request overrides and the page
-// origin/referer headers, plus the jar's cookie header for the target host.
-// Secrets in the jar are never logged.
+// applyHeaders sets the site defaults, per-request overrides and — for POSTs
+// only — the page origin/referer headers, plus the jar's cookie header for the
+// target host. Secrets in the jar are never logged.
+//
+// GETs deliberately carry only the site headers: core/fetch.ts adds
+// origin/referer in postAjax()/callers, never in fetchPage(). Injecting them
+// unconditionally also changes which edge cache entry a CDN serves (a
+// Cloudflare cache keyed on Origin returns a *different, differently-aged*
+// body for the same URL), so a Go GET would silently disagree with TS.
 func (s *Site) applyHeaders(req *http.Request, extra map[string]string) {
 	for k, v := range s.headers {
 		req.Header.Set(k, v)
 	}
-	req.Header.Set("origin", s.base)
-	req.Header.Set("referer", s.base+"/")
+	if req.Method == http.MethodPost {
+		req.Header.Set("origin", s.base)
+		req.Header.Set("referer", s.base+"/")
+	}
 	for k, v := range extra {
 		req.Header.Set(k, v)
 	}
