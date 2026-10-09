@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-09
 
-**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 240 rows / 80 commands × 3 runtimes: 180 pass / 0 fail / 0 skip-waf / 59 n/a / 1 `empty-consistent`; guards separately 28 rows: 22 pass / 0 fail / 6 n/a). The n/a rows are the surfaces the Rust port does not implement (tiktok, spotify, remaining anime/manga surfaces — Rust covers nontonanime only), reported as n/a rather than failed via `skip` in `tools/parity.ts`. Rows are never counted as pass on a technicality: `spotify search` is `volatile` (Spotify's relevance ranking flips the LANY / "Daft Poets Society" tail order between runs, which disagreed across ports once), and `anilist search` is reported as `empty-consistent` because anilist.co is an SPA so *both* scrape paths return `[]` by design — the row exists to catch one port gaining the GraphQL path without the other.
+**Status**: Implemented — verified live 2026-10-08 (`bun tools/parity.ts --live` → 243 rows / 81 commands × 3 runtimes: 182 pass / 0 fail / 0 skip-waf / 60 n/a / 1 `empty-consistent`; guards separately 28 rows: 22 pass / 0 fail / 6 n/a). The n/a rows are the surfaces the Rust port does not implement (tiktok, spotify, remaining anime/manga surfaces — Rust covers nontonanime only), reported as n/a rather than failed via `skip` in `tools/parity.ts`. Rows are never counted as pass on a technicality: `spotify search` is `volatile` (Spotify's relevance ranking flips the LANY / "Daft Poets Society" tail order between runs, which disagreed across ports once), and `anilist search` is reported as `empty-consistent` because anilist.co is an SPA so *both* scrape paths return `[]` by design — the row exists to catch one port gaining the GraphQL path without the other. `samehadaku` is only partly testable: Cloudflare challenges its home/search/schedule/detail/batch/mirrors URLs for the Bun transport, so `list` and `episode` are the two live rows (both byte-identical across ports).
 
 **Contract finding (2026-10-08)**: expanding the suite to `lk21` caught a real cross-port divergence the earlier rows could not see. Go's `applyHeaders` injected `origin`/`referer` on *every* request; the TS reference (`core/fetch.ts`) sends them only for POSTs, so a Go GET differed from a TS GET on the wire. That CDN keys a Cloudflare cache entry on `Origin`, so the two ports read *different, differently-aged* bodies for the same URL and `lk21 list` disagreed on one vote counter (6710 vs 6711, `age=3793` vs `age=1731`). Go now gates those headers on POST, matching the reference; both lk21 rows are byte-identical and `scrapers/transport_headers_test.go` locks the contract.
 
@@ -74,9 +74,9 @@ The suite verifies security guard behavior is identical across runtimes: travers
 
 ## Review & Acceptance Checklist
 
-- [x] All 80 CLI commands covered with identical args across runtimes
+- [x] All 81 CLI commands covered with identical args across runtimes
 - [x] JSON deep-equal has explicit, documented ignore-list for volatile fields (nonce/postId/bare-URL policy in `tools/parity.ts`)
 - [x] Guard suite runs offline (`--guards-only`, 14 guard commands, no network)
 - [x] Exit codes 0/1/2 implemented per story 3
 - [x] Report JSON written on every run (gitignored: `specs/*/parity-report.json`)
-- [x] Suite completes < 10 min on residential connection (250.9s observed, 268 rows)
+- [x] Suite completes < 10 min on residential connection (238.8s observed, 271 rows)
