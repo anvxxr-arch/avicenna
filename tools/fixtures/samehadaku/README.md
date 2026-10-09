@@ -11,6 +11,7 @@ pins the parsers against these instead.
 | `list.html` | `/anime-terbaru/` | `div.post-show` + `.pagination` |
 | `search.html` | `/?s=one piece` | `.content-area` (`article.animpost`) |
 | `search-live.html` | `/?s=one piece` (2026-10-08) | `.content-area` (`article.animepost`) |
+| `detail-live.html` | `/anime/one-piece/` (2026-10-08, Tailwind redesign) | `h1[itemprop="headline"]`, `span.w-28.font-medium`, `div[class*=aspect-] img`, `span.font-extrabold`, `div.flex.items-center.gap-3` |
 | `detail.html` | `/anime/one-piece/` | `.infoanime`, `.whites.lsteps`, `.listbatch` |
 | `episode.html` | `/one-piece-episode-1180/` | `.server_option`, `#downloadb` |
 | `episode-head.html` | same | `h1.entry-title`, `.naveps` |

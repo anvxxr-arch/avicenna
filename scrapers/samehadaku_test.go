@@ -298,3 +298,54 @@ func TestSamehadakuApkFixtures(t *testing.T) {
 		t.Errorf("prev = %q", prev)
 	}
 }
+
+// Live capture (2026-10-08) of /anime/one-piece/ after the site moved to a
+// Tailwind layout. Every old anchor is gone (`.infoanime`, `.whites.lsteps`,
+// `.listbatch`, `#downloadb`, `[itemprop="ratingValue"]`, `img.anmsa`), so
+// shDetail used to answer a hollow `{details:{}, episodes:[]}` at rc=0 while the
+// TS reference raised WAF-blocked. This pins the redesigned-markup fallbacks.
+func TestSamehadakuDetailLiveMarkup(t *testing.T) {
+	doc := shFixture(t, "detail-live.html")
+	out := shDetailFromDoc(doc, "one-piece", "https://v2.samehadaku.how/anime/one-piece/")
+
+	if out["title"] != "One Piece Sub Indo" {
+		t.Errorf("title = %v", out["title"])
+	}
+	if out["rating"] != "8.72" {
+		t.Errorf("rating = %v", out["rating"])
+	}
+	if out["poster"] != "https://v2.samehadaku.how/wp-content/uploads/2020/04/E5RxYkWX0AAwdGH.png.jpg" {
+		t.Errorf("poster = %v", out["poster"])
+	}
+	if s, _ := out["sinopsis"].(string); !strings.HasPrefix(s, "Nonton Streaming anime One Piece Sub Indo") {
+		t.Errorf("sinopsis = %q", s)
+	}
+	genres, _ := out["genres"].([]any)
+	if len(genres) != 7 || genres[0] != "Action" || genres[6] != "Super Power" {
+		t.Errorf("genres = %v", genres)
+	}
+	details, _ := out["details"].(map[string]any)
+	if len(details) != 12 {
+		t.Errorf("details count = %d (%v)", len(details), details)
+	}
+	if details["Studio"] != "Toei Animation" || details["Status"] != "Ongoing" || details["Type"] != "TV" {
+		t.Errorf("details = %v", details)
+	}
+	if out["episodeCount"] != 3 {
+		t.Fatalf("episodeCount = %v", out["episodeCount"])
+	}
+	eps, _ := out["episodes"].([]any)
+	first, _ := eps[0].(map[string]any)
+	if first["episode"] != "1180" || first["title"] != "One Piece Episode 1180" ||
+		first["url"] != "https://v2.samehadaku.how/one-piece-episode-1180/" ||
+		first["date"] != "28 September 2026" {
+		t.Errorf("episodes[0] = %v", first)
+	}
+	batches, _ := out["batches"].([]any)
+	if len(batches) != 1 {
+		t.Fatalf("batches = %v", batches)
+	}
+	if b, _ := batches[0].(map[string]any); b["url"] != "https://v2.samehadaku.how/batch/one-piece-batch-part-2/" {
+		t.Errorf("batches[0] = %v", batches[0])
+	}
+}

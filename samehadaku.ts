@@ -109,6 +109,10 @@ function parseAnimpostCard($: CheerioAPI, el: unknown): Rec | null {
 /** Search-result card selector. The site renamed `animpost` → `animepost`; accept both. */
 const SH_SEARCH_CARD = 'article.animpost, article.animepost';
 
+/** Release-date span of a redesigned episode row ("28 September 2026"). Mirrors shDateRe. */
+const SH_DATE_RE =
+  /^\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+
 /** `?s=` search: results + the "Results found" count. */
 async function search(query: string): Promise<Rec> {
   const q = String(query || '').replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -185,13 +189,22 @@ async function detail(rawSlug: string): Promise<Rec> {
   const url = `${BASE}/anime/${slug}/`;
   const $ = safeCheerio(await fetchPage(url));
   const info = $('.infoanime');
-  const title = txt(info.find('h2.entry-title, h1.entry-title').first().text(), 200) || pageTitle($);
-  const rating = txt(info.find('[itemprop="ratingValue"]').first().text(), 12) || null;
+  // Redesigned (2026-10) layout: `.infoanime` and its whole class family are gone,
+  // so every field falls back to the new anchors. Keep this in lockstep with
+  // scrapers/samehadaku.go — the Go port carries the same fallbacks.
+  const title =
+    txt(info.find('h2.entry-title, h1.entry-title').first().text(), 200) ||
+    txt($('h1[itemprop="headline"]').first().text(), 200) ||
+    pageTitle($);
+  const rating =
+    txt(info.find('[itemprop="ratingValue"]').first().text(), 12) ||
+    txt($('span.font-extrabold').first().text(), 12) ||
+    null;
 
-  const sinopsis = txt(
-    $('.infoanime .desc, .infoanime .entry-content, .desc p').first().text().replace(/\s+/g, ' '),
-    1200,
-  );
+  const sinopsisRaw =
+    $('.infoanime .desc, .infoanime .entry-content, .desc p').first().text() ||
+    $('h1[itemprop="headline"]').parent().find('p.text-xs').first().text();
+  const sinopsis = txt(sinopsisRaw.replace(/\s+/g, ' '), 1200);
 
   const details: Rec = {};
   info.find('.spe span').each((_, s) => {
@@ -199,10 +212,29 @@ async function detail(rawSlug: string): Promise<Rec> {
     const i = raw.indexOf(':');
     if (i > 0) details[txt(raw.slice(0, i), 40)] = txt(raw.slice(i + 1), 200);
   });
+  // Redesigned markup splits each spec row into a label span carrying `w-28` and
+  // its `font-semibold` value; the `w-28` marker avoids matching every other
+  // `font-medium` span on the page.
+  if (Object.keys(details).length === 0) {
+    $('span.w-28.font-medium').each((_, s) => {
+      const label = txt($(s).text(), 40);
+      const val = txt($(s).parent().find('span.font-semibold').first().text(), 200);
+      if (label && val) details[label] = val;
+    });
+  }
   const genreInfo = $('.genre-info a, .infoanime .genre-info a')
     .map((_, g) => txt($(g).text(), 40))
     .get()
     .filter(Boolean);
+  // Redesigned markup renders genres as pills. Sibling "related anime" list items
+  // also link `/genre/…`, so `rel="tag"` ones are skipped here.
+  if (genreInfo.length === 0) {
+    $('a[href*="/genre/"]').each((_, g) => {
+      if ($(g).attr('rel') === 'tag') return;
+      const t = txt($(g).text(), 40);
+      if (t) genreInfo.push(t);
+    });
+  }
 
   const episodes: Rec[] = [];
   $('.lstepsiode.listeps li').each((_, el) => {
@@ -217,19 +249,51 @@ async function detail(rawSlug: string): Promise<Rec> {
       date: txt($el.find('.date').first().text(), 40) || null,
     });
   });
+  // Redesigned markup: one `div.flex.items-center.gap-3` per episode — number in a
+  // leading `div.shrink-0 a`, titled link in `h4 a`, release date in the trailing
+  // span. 100 rows on the live /anime/one-piece/.
+  if (episodes.length === 0) {
+    $('div.flex.items-center.gap-3').each((_, el) => {
+      const $el = $(el);
+      const a = $el.find('h4 a').first();
+      const href = abs(a.attr('href'));
+      if (!href) return;
+      let date = '';
+      $el.find('span').each((__, sp) => {
+        const t = txt($(sp).text(), 40);
+        if (SH_DATE_RE.test(t)) date = t;
+      });
+      episodes.push({
+        episode: txt($el.find('div.shrink-0 a').first().text(), 12) || null,
+        title: txt(a.text(), 160),
+        url: href,
+        date: date || null,
+      });
+    });
+  }
 
   const batches: Array<{ title: string; url: string }> = [];
   $('.listbatch a').each((_, el) => {
     const href = abs($(el).attr('href'));
     if (href) batches.push({ title: txt($(el).text(), 160), url: href });
   });
+  if (batches.length === 0) {
+    $('a[href*="/batch/"]').each((_, el) => {
+      const href = abs($(el).attr('href'));
+      if (href) batches.push({ title: txt($(el).text(), 160), url: href });
+    });
+  }
+  const poster =
+    info.find('img.anmsa, .thumb img').first().attr('src') ||
+    $('div[class*=aspect-] img').first().attr('src') ||
+    null;
 
   return {
     creator: CREATOR,
     url,
     slug,
     title,
-    poster: info.find('img.anmsa, .thumb img').first().attr('src') || null,
+    poster,
     rating,
     genres: genreInfo,
     details,

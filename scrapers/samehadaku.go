@@ -322,6 +322,9 @@ func shList(page int) (map[string]any, error) {
 	}, nil
 }
 
+// shDateRe matches the release-date span of a redesigned episode row ("28 September 2026").
+var shDateRe = regexp.MustCompile(`^\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$`)
+
 // shDetail mirrors detail().
 func shDetail(rawSlug string) (map[string]any, error) {
 	slug := shSlug(rawSlug)
@@ -336,13 +339,31 @@ func shDetail(rawSlug string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return shDetailFromDoc(doc, slug, pageURL), nil
+}
+
+// shDetailFromDoc is the extraction half of shDetail, split out so a fixture
+// (tools/fixtures/samehadaku/detail-live.html) can pin it with no network fetch.
+func shDetailFromDoc(doc *goquery.Document, slug, pageURL string) map[string]any {
 	info := doc.Find(".infoanime")
 	title := Txt(info.Find("h2.entry-title, h1.entry-title").First().Text(), 200)
+	// Redesigned (2026-10) markup: the live page dropped every `.infoanime` class,
+	// so each field below falls back to the new anchor, and the `Txt` collapse
+	// keeps the new synopsis byte-compatible with the reference's whitespace strip.
+	if title == "" {
+		title = Txt(doc.Find(`h1[itemprop="headline"]`).First().Text(), 200)
+	}
 	if title == "" {
 		title = shPageTitle(doc)
 	}
 	rating := nilOrStr(Txt(info.Find(`[itemprop="ratingValue"]`).First().Text(), 12))
+	if rating == nil {
+		rating = nilOrStr(Txt(doc.Find("span.font-extrabold").First().Text(), 12))
+	}
 	sinopsis := Txt(doc.Find(".infoanime .desc, .infoanime .entry-content, .desc p").First().Text(), 1200)
+	if sinopsis == "" {
+		sinopsis = Txt(doc.Find(`h1[itemprop="headline"]`).Parent().Find("p.text-xs").First().Text(), 1200)
+	}
 	details := map[string]any{}
 	info.Find(".spe span").Each(func(_ int, s *goquery.Selection) {
 		raw := Txt(s.Text(), 200)
@@ -350,12 +371,37 @@ func shDetail(rawSlug string) (map[string]any, error) {
 			details[Txt(raw[:i], 40)] = Txt(raw[i+1:], 200)
 		}
 	})
+	// Redesigned markup splits each spec row into two spans: a label carrying
+	// `w-28` and its `font-semibold` value. The `w-28` marker is what keeps this
+	// from matching every other `font-medium` span on the page.
+	if len(details) == 0 {
+		doc.Find("span.w-28.font-medium").Each(func(_ int, s *goquery.Selection) {
+			label := Txt(s.Text(), 40)
+			val := Txt(s.Parent().Find("span.font-semibold").First().Text(), 200)
+			if label != "" && val != "" {
+				details[label] = val
+			}
+		})
+	}
 	genres := []any{}
 	doc.Find(".genre-info a, .infoanime .genre-info a").Each(func(_ int, g *goquery.Selection) {
 		if t := Txt(g.Text(), 40); t != "" {
 			genres = append(genres, t)
 		}
 	})
+	// Redesigned markup renders the genres as pills. Sibling "related anime" list
+	// items also link `/genre/…`, so the `rel="tag"` ones are skipped rather than
+	// relied on a `:not()` in the selector.
+	if len(genres) == 0 {
+		doc.Find(`a[href*="/genre/"]`).Each(func(_ int, g *goquery.Selection) {
+			if rel, _ := g.Attr("rel"); rel == "tag" {
+				return
+			}
+			if t := Txt(g.Text(), 40); t != "" {
+				genres = append(genres, t)
+			}
+		})
+	}
 	episodes := []any{}
 	doc.Find(".lstepsiode.listeps li").Each(func(_ int, el *goquery.Selection) {
 		a := el.Find(".lchx a, a").First()
@@ -370,15 +416,50 @@ func shDetail(rawSlug string) (map[string]any, error) {
 			"date":    nilOrStr(Txt(el.Find(".date").First().Text(), 40)),
 		})
 	})
+	// Redesigned markup: one `div.flex.items-center.gap-3` per episode — the number
+	// in a leading `div.shrink-0 a`, the titled link in `h4 a`, the release date in
+	// the block's trailing span. Verified 100 rows on the live /anime/one-piece/.
+	if len(episodes) == 0 {
+		doc.Find("div.flex.items-center.gap-3").Each(func(_ int, el *goquery.Selection) {
+			a := el.Find("h4 a").First()
+			href, ok := a.Attr("href")
+			if !ok || href == "" {
+				return
+			}
+			date := ""
+			el.Find("span").Each(func(_ int, sp *goquery.Selection) {
+				if t := Txt(sp.Text(), 40); shDateRe.MatchString(t) {
+					date = t
+				}
+			})
+			episodes = append(episodes, map[string]any{
+				"episode": nilOrStr(Txt(el.Find("div.shrink-0 a").First().Text(), 12)),
+				"title":   Txt(a.Text(), 160),
+				"url":     shAbs(href),
+				"date":    nilOrStr(date),
+			})
+		})
+	}
 	batches := []any{}
 	doc.Find(".listbatch a").Each(func(_ int, a *goquery.Selection) {
 		if href, ok := a.Attr("href"); ok && href != "" {
 			batches = append(batches, map[string]any{"title": Txt(a.Text(), 160), "url": shAbs(href)})
 		}
 	})
+	if len(batches) == 0 {
+		doc.Find(`a[href*="/batch/"]`).Each(func(_ int, a *goquery.Selection) {
+			if href, ok := a.Attr("href"); ok && href != "" {
+				batches = append(batches, map[string]any{"title": Txt(a.Text(), 160), "url": shAbs(href)})
+			}
+		})
+	}
+	posterSrc := info.Find("img.anmsa, .thumb img").First().AttrOr("src", "")
+	if posterSrc == "" {
+		posterSrc = doc.Find(`div[class*=aspect-] img`).First().AttrOr("src", "")
+	}
 	out := map[string]any{
 		"creator": "avicenna", "url": pageURL, "slug": slug, "title": title,
-		"poster":   nilOrStr(info.Find("img.anmsa, .thumb img").First().AttrOr("src", "")),
+		"poster":   nilOrStr(posterSrc),
 		"rating":   rating,
 		"genres":   genres,
 		"details":  details,
@@ -390,7 +471,7 @@ func shDetail(rawSlug string) (map[string]any, error) {
 	if len(batches) > 0 {
 		out["batches"] = batches
 	}
-	return out, nil
+	return out
 }
 
 // shPlayerOptions reads the `.east_player_option` mirror list off a page.
