@@ -356,6 +356,21 @@ func jnum(v any) int64 {
 	return 0
 }
 
+// jsNum converts a decoded JSON value to what a JS `Number()` would hold, so the
+// re-encoded payload matches `JSON.parse` → `JSON.stringify`. `UseNumber` keeps the
+// source literal, which is what yt/tiktok need for their exact-digit ids, but it
+// also preserves a trailing `.0`: Spotify sends `"average":5.0` and the TS reference
+// (JSON.parse) turns that into `5`, so Go emitted `5.0` and `spotify show` diverged.
+// Only apply this where the value is a quantity, never to identity fields.
+func jsNum(v any) any {
+	if n, ok := v.(json.Number); ok {
+		if f, err := n.Float64(); err == nil {
+			return f
+		}
+	}
+	return v
+}
+
 // jstr returns the value as a string, "" when it is not one.
 func jstr(v any) string {
 	if s, ok := v.(string); ok {

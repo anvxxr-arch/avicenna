@@ -759,7 +759,7 @@ func spotifyShow(id string) (map[string]any, error) {
 		out["publisher"] = s["publisher"]
 	}
 	if rating != nil && avgRating != nil {
-		out["rating"] = map[string]any{"average": avgRating["average"], "totalRatings": avgRating["totalRatings"]}
+		out["rating"] = map[string]any{"average": jsNum(avgRating["average"]), "totalRatings": jsNum(avgRating["totalRatings"])}
 	} else {
 		out["rating"] = nil
 	}

@@ -161,6 +161,29 @@ const CASES: Case[] = [
   // `yt related` rotates like `yt search`: neither port is self-stable, because the
   // recommendation set is drawn per request. Shape row, same reasoning as yt-search.
   { name: 'yt-related', args: ['yt', 'related', 'dQw4w9WgXcQ'], volatile: [['$']], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
+  // Fifth wave (2026-10-09): ids taken from the already-verified `search` rows
+  // (Spotify `spotify:album|artist|episode|playlist|show:` URIs, drowify `search`).
+  // The five metadata rows below are deep-equal and self-stable on both ports.
+  { name: 'spotify-album', args: ['spotify', 'album', '2noRn2Aes5aoNVsU6iWThc'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // `spotify artist` is deep-equal on the payload it owns, but `stats` is entirely
+  // live counters: the follower total moved 11831265 → 11833895 between two runs
+  // while each port stayed self-stable within a window, so the two ports' fetches
+  // land on different values. Relax the whole stats block to its shape.
+  { name: 'spotify-artist', args: ['spotify', 'artist', '4tZwfgrHOc3mvqYlEYSvVi'], volatile: [['stats', '$']], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  { name: 'spotify-episode', args: ['spotify', 'episode', '1BMItZ4I3tbpown0D7r5Of'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  { name: 'spotify-playlist', args: ['spotify', 'playlist', '2jTy5QwqWJ1ZUv2XeJPYbn'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // `spotify show` used to diverge: Spotify sends `"average":5.0` and the pipeline
+  // decodes with UseNumber, so Go re-emitted `5.0` while the TS reference
+  // (JSON.parse) emitted `5`. Fixed with `jsNum` at the extraction site; the row now
+  // pins the fix.
+  { name: 'spotify-show', args: ['spotify', 'show', '2Fi1hZJoCaFDmuAYxHwDku'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  { name: 'drowify-album', args: ['drowify', 'album', 'MPREb_6ltN0RAMbYp'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  // The three below rotate their *contents* on both ports (audience counts and
+  // release lists move between requests) while the envelope holds, so they are shape
+  // rows — deep-equal is unattainable, the shape is not.
+  { name: 'drowify-artist', args: ['drowify', 'artist', 'UCHx9WOuM45MPGoE64-1LOeQ'], volatile: [['$']], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  { name: 'drowify-search', args: ['drowify', 'search', 'dangdut'], volatile: [['$']], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  { name: 'ytmusic-related', args: ['ytmusic', 'related', 'onCZOgWlr1U'], volatile: [['$']], skip: ['rs'], tsFile: 'ytmusic.ts', tsDrop: 1 },
   { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
   // Second expansion wave: every remaining Go/TS surface, each deep-equal and
