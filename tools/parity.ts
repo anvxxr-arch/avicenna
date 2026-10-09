@@ -145,6 +145,22 @@ const CASES: Case[] = [
   // silently still a full deep-equal (which is what `spotify-search` was).
   { name: 'yt-search', args: ['yt', 'search', 'lofi'], volatile: [['$']], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
   { name: 'ytmusic-search', args: ['ytmusic', 'search', 'lofi'], volatile: [['$']], skip: ['rs'], tsFile: 'ytmusic.ts', tsDrop: 1 },
+  // Fourth wave (2026-10-09): the genre surfaces plus `otakudesu watch`, each
+  // verified with two runs per port — rc=0 both sides, self-stable, deep-equal
+  // cross-port. Neutral genre slugs, so a row never depends on an adult category.
+  { name: 'animeindo-genre', args: ['animeindo', 'genre', 'action'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'kanzenin-genre', args: ['kanzenin', 'genre', 'mature'], skip: ['rs'], tsFile: 'kanzenin.ts', tsDrop: 1 },
+  { name: 'mangasusuku-genre', args: ['mangasusuku', 'genre', 'drama'], skip: ['rs'], tsFile: 'mangasusuku.ts', tsDrop: 1 },
+  { name: 'ngomik-genre', args: ['ngomik', 'genre', 'action'], skip: ['rs'], tsFile: 'ngomik.ts', tsDrop: 1 },
+  { name: 'otakudesu-genre', args: ['otakudesu', 'genre', 'action'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-watch', args: ['otakudesu', 'watch', 'wpoiec-episode-936-sub-indo'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  // anilist.co is an SPA and `anilist detail` takes a URL, so both ports answer a
+  // bare slug with the same `{"error":"Invalid URL"}` at exit 0. This row pins that
+  // shared validation contract; there is no live detail payload to compare.
+  { name: 'anilist-detail-invalid-url', args: ['anilist', 'detail', 'one-piece'], skip: ['rs'], tsFile: 'anilist.ts', tsDrop: 1 },
+  // `yt related` rotates like `yt search`: neither port is self-stable, because the
+  // recommendation set is drawn per request. Shape row, same reasoning as yt-search.
+  { name: 'yt-related', args: ['yt', 'related', 'dQw4w9WgXcQ'], volatile: [['$']], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
   { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
   // Second expansion wave: every remaining Go/TS surface, each deep-equal and
@@ -222,6 +238,9 @@ const GUARDS: Array<{ name: string; args: string[]; skip?: string[]; tsFile?: st
   // spotify: both entrypoints must refuse a missing id/query with exit 1.
   { name: 'spotify-missing-id', args: ['spotify', 'track'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
   { name: 'spotify-empty-query', args: ['spotify', 'search'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
+  // samehadaku apk takes a numeric post id; the bare form is rejected by argument
+  // validation before any request is made, with the identical message on both sides.
+  { name: 'samehadaku-apk-no-id', args: ['samehadaku', 'apk'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
 ];
 
 const NONCE_RE = /^[a-f0-9]{6,20}$/;
