@@ -425,7 +425,10 @@ async function batch(rawSlug: string): Promise<Rec> {
     url,
     slug,
     title: txt($('h1.entry-title').first().text(), 200) || pageTitle($),
-    poster: $('.thumb-batch img, .content-batch img').first().attr('src') || null,
+    poster:
+      $('.thumb-batch img, .content-batch img').first().attr('src') ||
+      $('.infoanime .thumb img, img.anmsa').first().attr('src') ||
+      null,
     count: groups.length,
     groups,
   };

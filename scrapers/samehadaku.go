@@ -625,16 +625,29 @@ func shBatch(rawSlug string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return shBatchFromDoc(doc, slug, pageURL), nil
+}
+
+// shBatchFromDoc is the extraction half of shBatch, split out for fixture tests.
+func shBatchFromDoc(doc *goquery.Document, slug, pageURL string) map[string]any {
 	groups := shDownloadGroups(doc)
 	title := Txt(doc.Find("h1.entry-title").First().Text(), 200)
 	if title == "" {
 		title = shPageTitle(doc)
 	}
+	// The live batch page still carries the PRE-redesign markup: the poster is an
+	// `img.anmsa` inside `.infoanime .thumb`. `.thumb-batch`/`.content-batch` are
+	// the historical selectors and only still match older captures, so without the
+	// fallback the live poster came back null while groups parsed fine.
+	poster := doc.Find(".thumb-batch img, .content-batch img").First().AttrOr("src", "")
+	if poster == "" {
+		poster = doc.Find(".infoanime .thumb img, img.anmsa").First().AttrOr("src", "")
+	}
 	return map[string]any{
 		"creator": "avicenna", "url": pageURL, "slug": slug, "title": title,
-		"poster": nilOrStr(doc.Find(".thumb-batch img, .content-batch img").First().AttrOr("src", "")),
+		"poster": nilOrStr(poster),
 		"count":  len(groups), "groups": groups,
-	}, nil
+	}
 }
 
 var shSlugRe = regexp.MustCompile(`(?i)^[a-z0-9-]+$`)

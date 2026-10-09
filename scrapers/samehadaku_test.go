@@ -349,3 +349,39 @@ func TestSamehadakuDetailLiveMarkup(t *testing.T) {
 		t.Errorf("batches[0] = %v", batches[0])
 	}
 }
+
+// Live capture (2026-10-08) of /batch/one-piece-batch-part-2/. This page was NOT
+// redesigned — it still uses `.infoanime`, `.thumb` and `h1.entry-title` — but the
+// poster selector was written against `.thumb-batch`/`.content-batch`, which no
+// longer exist, so the live poster came back null while the 15 download groups
+// parsed fine. The live poster is an `img.anmsa` inside `.infoanime .thumb`.
+func TestSamehadakuBatchLiveMarkup(t *testing.T) {
+	doc := shFixture(t, "batch-live.html")
+	out := shBatchFromDoc(doc, "one-piece-batch-part-2", "https://v2.samehadaku.how/batch/one-piece-batch-part-2/")
+
+	if out["title"] != "One Piece [BATCH] Part 2" {
+		t.Errorf("title = %v", out["title"])
+	}
+	if out["poster"] != "https://v2.samehadaku.how/wp-content/uploads/2020/04/E5RxYkWX0AAwdGH.png.jpg" {
+		t.Errorf("poster = %v", out["poster"])
+	}
+	if out["count"] != 1 {
+		t.Fatalf("count = %v", out["count"])
+	}
+	groups, _ := out["groups"].([]any)
+	g0, _ := groups[0].(map[string]any)
+	if g0["label"] != "One Piece Episode 1001-1025 MKV" {
+		t.Errorf("label = %v", g0["label"])
+	}
+	entries, _ := g0["entries"].([]any)
+	e0, _ := entries[0].(map[string]any)
+	if e0["quality"] != "360p" {
+		t.Errorf("quality = %v", e0["quality"])
+	}
+	servers, _ := e0["servers"].([]any)
+	s0, _ := servers[0].(map[string]any)
+	if s0["name"] != "Acefile" ||
+		s0["url"] != "https://acefile.co/f/79720772/360-mkv-op-1001-1025-samehadaku-care-rar" {
+		t.Errorf("servers[0] = %v", s0)
+	}
+}
