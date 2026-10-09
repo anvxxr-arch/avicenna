@@ -178,6 +178,15 @@ const CASES: Case[] = [
   // pins the fix.
   { name: 'spotify-show', args: ['spotify', 'show', '2Fi1hZJoCaFDmuAYxHwDku'], skip: ['rs'], tsFile: 'spotify.ts', tsDrop: 1 },
   { name: 'drowify-album', args: ['drowify', 'album', 'MPREb_6ltN0RAMbYp'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  // Sixth wave (2026-10-09): videoId discovered in the `drowify album` payload
+  // (`songs[0].videoId`), which is what `audio`/`lyrics` both require.
+  { name: 'drowify-audio', args: ['drowify', 'audio', 'cHissexl3yg'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
+  // `drowify lyrics` is a shape row: it was byte-identical across ports 4 runs each
+  // way *and* returned a shorter 5942-byte document from Go in an earlier window, so
+  // the live lyrics document (provider/length) varies over time while the envelope
+  // does not. A deep-equal row here would flake; the shape still pins
+  // {album,artist,lyrics:{lines,type},source,title,videoId}.
+  { name: 'drowify-lyrics', args: ['drowify', 'lyrics', 'cHissexl3yg'], volatile: [['$']], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   // The three below rotate their *contents* on both ports (audience counts and
   // release lists move between requests) while the envelope holds, so they are shape
   // rows — deep-equal is unattainable, the shape is not.
