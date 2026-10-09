@@ -13,6 +13,7 @@ pins the parsers against these instead.
 | `search-live.html` | `/?s=one piece` (2026-10-08) | `.content-area` (`article.animepost`) |
 | `detail-live.html` | `/anime/one-piece/` (2026-10-08, Tailwind redesign) | `h1[itemprop="headline"]`, `span.w-28.font-medium`, `div[class*=aspect-] img`, `span.font-extrabold`, `div.flex.items-center.gap-3` |
 | `batch-live.html` | `/batch/one-piece-batch-part-2/` (2026-10-08) | `h1.entry-title`, `.infoanime .thumb img` (poster; `.thumb-batch`/`.content-batch` no longer exist) |
+| `schedule-live.html` | `/jadwal/` (2026-10-09) | `div.result-schedule[x-show="activeDay === 'monday'"]` → `div.animepost` (trimmed to 2 of 13 cards; the schedule's REST endpoint `custom/v1/all-schedule` is gone) |
 | `detail.html` | `/anime/one-piece/` | `.infoanime`, `.whites.lsteps`, `.listbatch` |
 | `episode.html` | `/one-piece-episode-1180/` | `.server_option`, `#downloadb` |
 | `episode-head.html` | same | `h1.entry-title`, `.naveps` |

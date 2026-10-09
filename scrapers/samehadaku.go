@@ -717,22 +717,48 @@ func shEncode(s string) string {
 
 var shScheduleDays = []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 
-// shSchedule mirrors schedule(): the weekly schedule comes from the site's own
-// REST endpoint, so the payload is the upstream array re-wrapped.
+// shSchedule mirrors schedule(): the weekly schedule.
+//
+// The REST endpoint this used to read (`custom/v1/all-schedule`) has been removed
+// from the site — it 404s, the whole `custom/v1` namespace is gone, and its `apk`
+// namespace replacement (`/wp-json/apk/schedule`) returns every airing anime at
+// once with no per-day field (`time` is free text: "02:00", "Fridays at 00:55
+// (JST)", "02.00"), so it cannot be filtered by day. The surviving source is the
+// `/jadwal/` page: it renders all seven days as
+// `div.result-schedule[x-show="activeDay === '<day>'"]` panels of `div.animepost`
+// cards, which is the same card markup the home/search parsers already read.
 func shSchedule(day string) (map[string]any, error) {
 	d := strings.ToLower(strings.TrimSpace(day))
 	if !slices.Contains(shScheduleDays, d) {
 		return nil, fmt.Errorf("Day must be one of: %s", strings.Join(shScheduleDays, ", "))
 	}
-	raw, err := shSite.Fetch("/wp-json/custom/v1/all-schedule?perpage=20&day=" + d)
+	doc, err := shDoc(shBase + "/jadwal/")
 	if err != nil {
 		return nil, err
 	}
-	var items []any
-	if err := json.Unmarshal([]byte(raw), &items); err != nil {
-		return nil, err
-	}
+	items := shScheduleFromDoc(doc, d)
 	return map[string]any{"creator": "avicenna", "day": d, "count": len(items), "items": items}, nil
+}
+
+// shScheduleFromDoc is the extraction half of shSchedule, split out for fixture tests.
+func shScheduleFromDoc(doc *goquery.Document, day string) []any {
+	items := []any{}
+	panel := doc.Find(fmt.Sprintf(`div.result-schedule[x-show="activeDay === '%s'"]`, day)).First()
+	if panel.Length() == 0 {
+		return items
+	}
+	panel.Find("div.animepost").Each(func(_ int, card *goquery.Selection) {
+		item := shAnimpostCard(card)
+		if item == nil {
+			return
+		}
+		// The airing time is schedule-only; add it rather than duplicating the card parser.
+		if t := Txt(card.Find("a.ltseps").First().Text(), 40); t != "" {
+			item["time"] = t
+		}
+		items = append(items, item)
+	})
+	return items
 }
 
 // samehadakuScraper builds the CLI surface (identical to the TS reference).

@@ -100,13 +100,22 @@ const CASES: Case[] = [
   { name: 'otakudesu-search', args: ['otakudesu', 'search', 'naruto'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
   { name: 'otakudesu-genrelist', args: ['otakudesu', 'genrelist'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
   { name: 'otakudesu-jadwal', args: ['otakudesu', 'jadwal'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  // Every samehadaku surface is now fetchable by BOTH ports. What looked like a
+  // permanent WAF block on the TS side was a UA-string problem: the Cloudflare
+  // rule in front of the site challenges `Chrome/<major>.0.0.0` (403 +
+  // interstitial on `/`, `/?s=`, `/anime/<slug>/`, `/batch/<slug>/`) while the
+  // bare `Chrome/<major>` form passes with 200 — A/B over nine UA variants, the
+  // `(KHTML, like Gecko)` token is irrelevant. Go's HTTP/2 path never noticed.
+  // All eight surfaces below verified deep-equal after that fix.
+  { name: 'samehadaku-home', args: ['samehadaku', 'home'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  { name: 'samehadaku-search', args: ['samehadaku', 'search', 'one piece'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
   { name: 'samehadaku-list', args: ['samehadaku', 'list'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
-  // samehadaku `episode` is the only other samehadaku surface both ports can
-  // actually fetch: Cloudflare only challenges the home/search/schedule/detail/
-  // batch/mirrors URLs for Bun (Go's HTTP/2 fingerprint gets through), while
-  // `episode` and `list` return identical bodies to both. Verified byte-identical
-  // (10863 B, 9 players, 3 download groups) before landing.
+  { name: 'samehadaku-detail', args: ['samehadaku', 'detail', 'one-piece'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  // Verified byte-comparable (10863 B, 9 players, 3 download groups) before landing.
   { name: 'samehadaku-episode', args: ['samehadaku', 'episode', 'one-piece-episode-1179'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  { name: 'samehadaku-batch', args: ['samehadaku', 'batch', 'one-piece-batch-part-2'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  { name: 'samehadaku-mirrors', args: ['samehadaku', 'mirrors', 'one-piece-episode-1179'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  { name: 'samehadaku-schedule', args: ['samehadaku', 'schedule', 'monday'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
   { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
   // Second expansion wave: every remaining Go/TS surface, each deep-equal and

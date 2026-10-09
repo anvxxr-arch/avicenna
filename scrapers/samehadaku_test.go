@@ -385,3 +385,41 @@ func TestSamehadakuBatchLiveMarkup(t *testing.T) {
 		t.Errorf("servers[0] = %v", s0)
 	}
 }
+
+// Live capture (2026-10-09) of the /jadwal/ monday panel. The weekly schedule
+// moved off the REST endpoint this scraper used to read: `custom/v1/all-schedule`
+// now 404s and the whole `custom/v1` namespace is gone, while its `apk`
+// replacement (`/wp-json/apk/schedule`) returns every airing anime at once with no
+// per-day field. The surviving source is the page's Alpine panels, so pin it.
+//
+// The shared card parser is reused unchanged, which means `status` holds the
+// `.data .type` text — on home/search that is the airing status, on /jadwal/ the
+// site puts the genre list there. Both ports read the same selector, so they agree
+// either way; the value is pinned below so a silent change to it is caught.
+func TestSamehadakuScheduleLiveMarkup(t *testing.T) {
+	doc := shFixture(t, "schedule-live.html")
+	items := shScheduleFromDoc(doc, "monday")
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2 (fixture keeps the first 2 of 13 cards)", len(items))
+	}
+	first, _ := items[0].(map[string]any)
+	for key, want := range map[string]any{
+		"title":  "One Piece",
+		"slug":   "one-piece",
+		"url":    "https://v2.samehadaku.how/anime/one-piece/",
+		"poster": "https://v2.samehadaku.how/wp-content/uploads/2020/04/E5RxYkWX0AAwdGH.png-212x300.jpg",
+		"type":   "TV",
+		"score":  "8.72",
+		"status": "Action, Adventure",
+		"time":   "00:00",
+	} {
+		if first[key] != want {
+			t.Errorf("%s = %v, want %v", key, first[key], want)
+		}
+	}
+	// The day selector must actually filter: this fixture only carries the monday
+	// panel, so any other day has to come back empty.
+	if got := shScheduleFromDoc(doc, "tuesday"); len(got) != 0 {
+		t.Errorf("tuesday items = %d, want 0", len(got))
+	}
+}

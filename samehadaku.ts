@@ -31,8 +31,14 @@ const site = createSite({
   base: BASE,
   rateMs: 450,
   headers: {
+    // The Cloudflare rule in front of this site challenges the conventional
+    // `Chrome/<major>.0.0.0` UA string on `/`, `/?s=`, `/anime/<slug>/` and
+    // `/batch/<slug>/` (403 + interstitial), while the same UA with a bare
+    // `Chrome/<major>` version passes with 200. Verified by A/B over nine UA
+    // variants: bare version → 200, `.0.0.0` → 403, regardless of the
+    // `(KHTML, like Gecko)` token. Keep the bare form.
     'user-agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36',
     accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
     ...(process.env.SAMEHADAKU_COOKIE ? { cookie: process.env.SAMEHADAKU_COOKIE } : {}),
@@ -456,14 +462,36 @@ async function apkEpisode(id: string): Promise<Rec> {
 
 const SCHEDULE_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
-/** `schedule <day>`: the weekly release schedule, from the site's own REST endpoint. */
+/**
+ * `schedule <day>`: the weekly release schedule.
+ *
+ * The REST endpoint this used to read (`custom/v1/all-schedule`) has been removed
+ * from the site — it 404s, the whole `custom/v1` namespace is gone, and its `apk`
+ * namespace replacement (`/wp-json/apk/schedule`) returns every airing anime at
+ * once with no per-day field (`time` is free text: "02:00", "Fridays at 00:55
+ * (JST)", "02.00"), so it cannot be filtered by day. The surviving source is the
+ * `/jadwal/` page: it renders all seven days as
+ * `div.result-schedule[x-show="activeDay === '<day>'"]` panels of `div.animepost`
+ * cards, which is the same card markup the home/search parsers already read.
+ */
 async function schedule(day: string): Promise<Rec> {
   const d = String(day || '').toLowerCase().trim();
   if (!SCHEDULE_DAYS.includes(d as (typeof SCHEDULE_DAYS)[number])) {
     throw new Error(`Day must be one of: ${SCHEDULE_DAYS.join(', ')}`);
   }
-  const raw = await fetchPage(`/wp-json/custom/v1/all-schedule?perpage=20&day=${d}`);
-  const items = JSON.parse(raw) as Rec[];
+  const $ = safeCheerio(await fetchPage('/jadwal/'));
+  const items: Rec[] = [];
+  $(`div.result-schedule[x-show="activeDay === '${d}'"]`)
+    .first()
+    .find('div.animepost')
+    .each((_, el) => {
+      const item = parseAnimpostCard($, el);
+      if (!item) return;
+      // The airing time is schedule-only; add it rather than duplicating the card parser.
+      const time = txt($(el as never).find('a.ltseps').first().text(), 40);
+      if (time) item.time = time;
+      items.push(item);
+    });
   return { creator: CREATOR, day: d, count: items.length, items };
 }
 
