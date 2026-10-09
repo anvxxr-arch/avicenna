@@ -77,7 +77,7 @@ exit 1, and output is JSON on stdout.
 ```bash
 bun run check              # typecheck (app + web) + guards + contracts + secret scan
 bun tools/parity.ts --guards-only   # 14 offline cross-runtime guard commands (22 pass · 6 n/a on Rust)
-bun tools/parity.ts --live          # 87 commands × 3 runtimes (194 pass · 0 fail · 66 n/a · 1 empty-consistent; guards add 22 pass · 6 n/a)
+bun tools/parity.ts --live          # 105 commands × 3 runtimes (230 pass · 0 fail · 84 n/a · 1 empty-consistent; guards add 22 pass · 6 n/a)
 bun tools/contract.ts --check       # 18 scrapers × live commands, payload shape contracts
 bun tools/contract.ts --capture     # re-record contracts after a deliberate change
 bun tools/scan-secrets.ts --all     # secret scan (also wired as .githooks/pre-commit)

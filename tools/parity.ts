@@ -116,6 +116,35 @@ const CASES: Case[] = [
   { name: 'samehadaku-batch', args: ['samehadaku', 'batch', 'one-piece-batch-part-2'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
   { name: 'samehadaku-mirrors', args: ['samehadaku', 'mirrors', 'one-piece-episode-1179'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
   { name: 'samehadaku-schedule', args: ['samehadaku', 'schedule', 'monday'], skip: ['rs'], tsFile: 'samehadaku.ts', tsDrop: 1 },
+  // Third expansion wave (2026-10-09): every row below was verified with two runs
+  // per port — rc=0 both sides, each port self-stable, and deep-equal cross-port.
+  // Long-running fixtures only (otakudesu `1piece-sub-indo`, 495 episodes, never a
+  // current-season slug that rotates).
+  { name: 'whitehouse-releases', args: ['whitehouse', 'releases'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-briefings', args: ['whitehouse', 'briefings'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-presidential-actions', args: ['whitehouse', 'presidential-actions'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-executive-orders', args: ['whitehouse', 'executive-orders'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-memoranda', args: ['whitehouse', 'memoranda'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-proclamations', args: ['whitehouse', 'proclamations'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-nominations', args: ['whitehouse', 'nominations'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-fact-sheets', args: ['whitehouse', 'fact-sheets'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-remarks', args: ['whitehouse', 'remarks'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-research', args: ['whitehouse', 'research'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'whitehouse-gallery', args: ['whitehouse', 'gallery'], skip: ['rs'], tsFile: 'whitehouse.ts', tsDrop: 1 },
+  { name: 'sankanime-genre', args: ['sankanime', 'genre', 'list'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  { name: 'otakudesu-detail', args: ['otakudesu', 'detail', '1piece-sub-indo'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'otakudesu-episode', args: ['otakudesu', 'episode', 'wpoiec-episode-936-sub-indo'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
+  { name: 'animeindo-episode', args: ['animeindo', 'episode', 'one-piece-episode-000'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  { name: 'animeindo-watch', args: ['animeindo', 'watch', 'one-piece-episode-000'], skip: ['rs'], tsFile: 'animeindo.ts', tsDrop: 1 },
+  // yt/ytmusic search cannot be deep-equalled: YouTube rotates the result set, so
+  // two consecutive requests from the SAME binary differ in ~64 of 68 items (ids,
+  // titles, view counters), and `estimatedResults` moves every run on both ports.
+  // The envelope is stable, so these are shape rows. That is only a real check
+  // because `normalize` now reduces a non-string `$` payload to its shape — it
+  // used to `return v` untouched, so a `volatile: [['$']]` row on an object was
+  // silently still a full deep-equal (which is what `spotify-search` was).
+  { name: 'yt-search', args: ['yt', 'search', 'lofi'], volatile: [['$']], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
+  { name: 'ytmusic-search', args: ['ytmusic', 'search', 'lofi'], volatile: [['$']], skip: ['rs'], tsFile: 'ytmusic.ts', tsDrop: 1 },
   { name: 'drowify-suggest', args: ['drowify', 'suggest', 'dangdut'], skip: ['rs'], tsFile: 'drowify.ts', tsDrop: 1 },
   { name: 'codeengo-styles', args: ['codeengo', 'styles'], skip: ['rs'], tsFile: 'codeengo.ts', tsDrop: 1 },
   // Second expansion wave: every remaining Go/TS surface, each deep-equal and
@@ -157,6 +186,9 @@ const CASES: Case[] = [
   { name: 'sankanime-supported', args: ['sankanime', 'supported'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
   { name: 'sankanime-detail', args: ['sankanime', 'detail', 'naruto-konohas-story-the-steam-ninja-scrolls'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
   { name: 'sankanime-chapter', args: ['sankanime', 'chapter', 'naruto-konohas-story-the-steam-ninja-scrolls-chapter-15'], skip: ['rs'], tsFile: 'sankanime.ts', tsDrop: 1 },
+  // `yt-info` is not volatile in its data; its one flaky field was the thumbnail's
+  // per-request CDN signature. `normalize` compares every URL by identity now, so
+  // the row stays a full deep-equal and needs no per-field relaxation.
   { name: 'yt-info', args: ['yt', 'info', 'dQw4w9WgXcQ'], skip: ['rs'], tsFile: 'yt.ts', tsDrop: 1 },
   { name: 'ytmusic-lyrics', args: ['ytmusic', 'lyrics', 'onCZOgWlr1U'], skip: ['rs'], tsFile: 'ytmusic.ts', tsDrop: 1 },
   { name: 'otakudesu-ongoing', args: ['otakudesu', 'ongoing'], skip: ['rs'], tsFile: 'otakudesu.ts', tsDrop: 1 },
@@ -257,12 +289,58 @@ async function runBinary(rt: Runtime, args: string[], tsFile?: string, tsDrop = 
   }
 }
 
+/**
+ * Shape descriptor for a jittering payload: keys and value kinds only, with arrays
+ * reduced to the kind-set of their elements (never length or contents). Strong
+ * enough to catch a port that drops a field or changes a type, immune to the
+ * reordering/rotation that makes a search payload un-comparable run to run.
+ */
+function shapeOnly(v: unknown): unknown {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) {
+    const kinds = new Set(v.map((x) => (Array.isArray(x) ? 'array' : x === null ? 'null' : typeof x)));
+    return { '[]': [...kinds].sort() };
+  }
+  if (typeof v === 'object') {
+    const src = v as Record<string, unknown>;
+    const o: Record<string, unknown> = {};
+    for (const k of Object.keys(src).sort()) {
+      const val = src[k];
+      o[k] = Array.isArray(val) ? shapeOnly(val) : val === null ? 'null' : typeof val;
+    }
+    return o;
+  }
+  return typeof v;
+}
+
+/**
+ * URL identity for parity: the path plus the *sorted names* of the query
+ * parameters. TikTok serves one avatar from a rotating CDN shard
+ * (`p16-common-sign` vs `p19-common-sign`) and YouTube re-signs every
+ * `i.ytimg.com` thumbnail per request (`sqp`/`rs`), so host and query values move
+ * while the asset does not — comparing them makes a green row fail at random.
+ * The path and the parameter set are still compared, so a port fetching a
+ * different asset, or a different shape of URL, still diverges.
+ */
+function urlIdentity(s: string): unknown {
+  try {
+    const u = new URL(s);
+    return { path: u.pathname, q: [...u.searchParams.keys()].sort() };
+  } catch {
+    return s;
+  }
+}
+
 /** Strip volatile fields. `$` = whole-output mode (URL format check only). */
 function normalize(v: unknown, volatile: string[][] = []): unknown {
   if (volatile.some((p) => p.length === 1 && p[0] === '$')) {
-    // whole-output volatile: resolve/stream return a bare URL string
-    if (typeof v === 'string') return URL_RE.test(v) ? '<url-ok>' : '<url-BAD>';
-    return v;
+    // Whole-output volatile. A bare string is a URL (resolve/stream, and any leaf
+    // path ending in `$`), so compare its identity rather than its bytes. Anything
+    // else is a payload whose *contents* rotate between requests (spotify/yt/
+    // ytmusic search results arrive in a different order, and a subset changes), so
+    // compare the shape and nothing else.
+    if (typeof v === 'string') return URL_RE.test(v) ? urlIdentity(v) : v;
+    return shapeOnly(v);
   }
   if (v && typeof v === 'object' && !Array.isArray(v)) {
     const o: Record<string, unknown> = {};
@@ -279,6 +357,12 @@ function normalize(v: unknown, volatile: string[][] = []): unknown {
     return o;
   }
   if (Array.isArray(v)) return v.map((x) => normalize(x, volatile));
+  // Every URL string, anywhere in any payload, is compared by identity. The host
+  // shard and the signature values of a CDN URL are chosen per request by the
+  // origin/CDN, not by the port, so comparing them byte-for-byte turns a green row
+  // red at random (observed: `tiktok-user.avatar` p16↔p19 shard, `yt-info.thumbnail`
+  // re-signed `sqp`/`rs`). Paths and parameter sets are still compared.
+  if (typeof v === 'string') return URL_RE.test(v) ? urlIdentity(v) : v;
   return v;
 }
 
